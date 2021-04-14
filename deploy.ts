@@ -1,14 +1,18 @@
-import { serve, serveStatic } from "https://deno.land/x/sift@0.2.0/mod.ts";
+import { serve } from "https://deno.land/x/sift@0.2.0/mod.ts";
 
 serve({
-  "/": serveStatic("./index.html", {
-    baseUrl: import.meta.url,
-    intervene: (res) => {
-      res.headers.set("content-type", "text/html; charset=utf-8");
-      return res;
-    },
-  }),
-  "/bundle.js": serveStatic("./bundle.js", {
-    baseUrl: import.meta.url,
-  }),
+  "/": async (req) => {
+    return new Response(await fetch("./index.html").then((r) => r.text()), {
+      headers: {
+        "content-type": "text/html",
+      },
+    });
+  },
+  "/bundle.js": async (req) => {
+    return new Response(await fetch("./bundle.js").then((r) => r.text()), {
+      headers: {
+        "content-type": "application/javascript",
+      },
+    });
+  },
 });
