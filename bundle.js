@@ -1371,25 +1371,31 @@ const logs = {
     gatt: (msg)=>log("Gatt", COLOR2, msg)
     ,
     info: (msg)=>log("Info", COLOR3, msg)
+    ,
+    error: (msg)=>log("Error", "red", msg)
 };
 define("init", async function() {
-    logs.band("Connecting...");
-    const band1 = await Band.connect();
-    define("band", band1);
-    logs.band("Connected to Band!");
-    band1.on("disconnect", ()=>{
-        logs.gatt("Disconnected");
-    });
-    band1.on("init", ()=>{
-        logs.gatt("Initialized");
-    });
-    await band1.init();
-    const revision = await band1.getRevision();
-    const hrdwRevision = await band1.getHrdwRevision();
-    logs.info(`Firmware ${revision}`);
-    logs.info(`Hardware ${hrdwRevision}`);
-    const battery = await band1.getBatteryInfo();
-    logs.info(`Battery (${battery.status}): ${battery.level} (last time charged: ${battery.lastLevel})`);
-    const time = await band1.getCurrentTime();
-    logs.info(`Current Time: ${time.hours}:${time.minutes}:${time.seconds} - ${time.date}/${time.month}/${time.year} (Day ${time.day})`);
+    try {
+        logs.band("Connecting...");
+        const band1 = await Band.connect();
+        define("band", band1);
+        logs.band("Connected to Band!");
+        band1.on("disconnect", ()=>{
+            logs.gatt("Disconnected");
+        });
+        band1.on("init", ()=>{
+            logs.gatt("Initialized");
+        });
+        await band1.init();
+        const revision = await band1.getRevision();
+        const hrdwRevision = await band1.getHrdwRevision();
+        logs.info(`Firmware ${revision}`);
+        logs.info(`Hardware ${hrdwRevision}`);
+        const battery = await band1.getBatteryInfo();
+        logs.info(`Battery (${battery.status}): ${battery.level} (last time charged: ${battery.lastLevel})`);
+        const time = await band1.getCurrentTime();
+        logs.info(`Current Time: ${time.hours}:${time.minutes}:${time.seconds} - ${time.date}/${time.month}/${time.year} (Day ${time.day})`);
+    } catch (e) {
+        logs.error(e.toString());
+    }
 });
