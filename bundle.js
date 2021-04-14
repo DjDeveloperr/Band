@@ -1377,7 +1377,7 @@ const logs = {
 async function init(n = false) {
     try {
         if (!n) alert("Connecting");
-        logs.band("Connecting...");
+        if (!n) logs.band("Connecting...");
         const band1 = await Band.connect();
         define("band", band1);
         logs.band("Connected to Band!");
