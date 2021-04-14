@@ -1,6 +1,6 @@
 /// <reference path="./types.d.ts"/>
 
-import { EventEmitter, AES } from "../deps.ts";
+import { EventEmitter } from "../deps.ts";
 import { AlertType, Chars, Services } from "./constants.ts";
 import {
   BatteryInfo,
