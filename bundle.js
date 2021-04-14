@@ -1374,6 +1374,7 @@ const logs = {
     ,
     error: (msg)=>log("Error", "red", msg)
 };
+logs.info("Init logger");
 async function init(n = false) {
     try {
         if (!n) alert("Connecting");
