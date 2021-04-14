@@ -1374,8 +1374,9 @@ const logs = {
     ,
     error: (msg)=>log("Error", "red", msg)
 };
-define("init", async function() {
+async function init(n = false) {
     try {
+        if (!n) alert("Connecting");
         logs.band("Connecting...");
         const band1 = await Band.connect();
         define("band", band1);
@@ -1396,6 +1397,8 @@ define("init", async function() {
         const time = await band1.getCurrentTime();
         logs.info(`Current Time: ${time.hours}:${time.minutes}:${time.seconds} - ${time.date}/${time.month}/${time.year} (Day ${time.day})`);
     } catch (e) {
-        logs.error(e.toString());
+        if (!n) alert(e.toString());
     }
+}
+init(true).catch(()=>{
 });
