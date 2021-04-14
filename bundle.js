@@ -1356,7 +1356,7 @@ class Band extends EventEmitter {
         ]).buffer);
     }
 }
-const log = (title, color, msg)=>console.log(`%c[${title}] %c${msg}`, `color: ${color};`, ``)
+const log = (title, color, msg)=>document.getElementById("logs").innerHTML += `<br/><span style="color: ${color}">[${title}]</span> <span>${msg}</span>`
 ;
 const define = (name, value)=>Object.defineProperty(window, name, {
         value
@@ -1388,4 +1388,8 @@ define("init", async function() {
     const hrdwRevision = await band1.getHrdwRevision();
     logs.info(`Firmware ${revision}`);
     logs.info(`Hardware ${hrdwRevision}`);
+    const battery = await band1.getBatteryInfo();
+    logs.info(`Battery (${battery.status}): ${battery.level} (last time charged: ${battery.lastLevel})`);
+    const time = await band1.getCurrentTime();
+    logs.info(`Current Time: ${time.hours}:${time.minutes}:${time.seconds} - ${time.date}/${time.month}/${time.year} (Day ${time.day})`);
 });

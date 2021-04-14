@@ -1,2 +1,2 @@
 @echo off
-deno bundle test.ts bundle.js
+deno bundle --no-check test.ts bundle.js
