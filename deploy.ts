@@ -10,9 +10,5 @@ serve({
   }),
   "/bundle.js": serveStatic("./bundle.js", {
     baseUrl: import.meta.url,
-    intervene: (res) => {
-      res.headers.set("content-type", "application/javascript");
-      return res;
-    },
   }),
 });
