@@ -6,6 +6,9 @@ export const Services = {
   HeartRate: "0000180d-0000-1000-8000-00805f9b34fb",
   DeviceInfo: "0000180a-0000-1000-8000-00805f9b34fb",
   DfuFirmware: "00001530-0000-3512-2118-0009af100700",
+  Unknown1: "00003802-0000-1000-8000-00805f9b34fb",
+  Unknown2: "00001801-0000-1000-8000-00805f9b34fb",
+  Unknown3: "00001800-0000-1000-8000-00805f9b34fb",
 };
 
 export const Chars = {
@@ -18,12 +21,13 @@ export const Chars = {
   CustomAlert: "00002a46-0000-1000-8000-00805f9b34fb",
   Battery: "00000006-0000-3512-2118-0009af100700",
   Steps: "00000007-0000-3512-2118-0009af100700",
-  LeParams: "0000FF09-0000-1000-8000-00805f9b34fb",
+  ControlPoint: "0000ff05-0000-1000-8000-00805f9b34fb",
+  FirmwareData: "0000ff08-0000-1000-8000-00805f9b34fb",
+  LeParams: "0000ff09-0000-1000-8000-00805f9b34fb",
   Revision: 0x2a28,
   Serial: 0x2a25,
   HrdwRevision: 0x2a27,
   Configuration: "00000003-0000-3512-2118-0009af100700",
-  DeviceEvent: "00000010-0000-3512-2118-0009af100700",
   ChunkedTransfer: "00000020-0000-3512-2118-0009af100700",
   Music: "00000010-0000-3512-2118-0009af100700",
   UserSettings: "00000008-0000-3512-2118-0009af100700",
@@ -36,14 +40,14 @@ export const Chars = {
 };
 
 export enum AlertType {
-  None = "\x00",
-  Message = "\x01",
-  Phone = "\x02",
+  None = 0,
+  Message = 1,
+  Phone = 2,
 }
 
 export enum MusicState {
-  Playing,
-  Paused,
+  Playing = 0,
+  Paused = 1,
 }
 
 export enum WeekDay {

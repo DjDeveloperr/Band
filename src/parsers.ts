@@ -1,6 +1,8 @@
+import { Struct } from "../deps.ts";
+
 export enum BatteryStatus {
-  Normal = "normal",
-  Charging = "charging",
+  Normal = "Normal",
+  Charging = "Charging",
 }
 
 export interface BatteryInfo {
@@ -82,4 +84,25 @@ export function packDate(date: DateTime): DataView {
   if (date.day) data.setInt8(7, date.day);
   if (date.fractions) data.setInt8(8, date.fractions);
   return data;
+}
+
+export interface StatusInfo {
+  steps: number;
+  meters: number;
+  fatsBurned: number;
+  calories: number;
+}
+
+export function parseStatus(data: DataView): StatusInfo {
+  const steps = data.getInt16(1, true);
+  const meters = data.getInt16(5, true);
+  const fatsBurned = data.getInt16(2, true);
+  const calories = data.getInt8(9);
+
+  return {
+    steps,
+    meters,
+    fatsBurned,
+    calories,
+  };
 }
