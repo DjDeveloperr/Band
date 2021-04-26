@@ -11,7 +11,7 @@ export class BandCharacteristics extends Base {
   fetch!: BluetoothRemoteGATTCharacteristic;
   activity!: BluetoothRemoteGATTCharacteristic;
   chunked!: BluetoothRemoteGATTCharacteristic;
-  music!: BluetoothRemoteGATTCharacteristic;
+  events!: BluetoothRemoteGATTCharacteristic;
   revision!: BluetoothRemoteGATTCharacteristic;
   hrdwRevision!: BluetoothRemoteGATTCharacteristic;
   battery!: BluetoothRemoteGATTCharacteristic;
@@ -40,7 +40,9 @@ export class BandCharacteristics extends Base {
     this.chunked = await this.band.services.main1.getCharacteristic(
       Chars.ChunkedTransfer
     );
-    this.music = await this.band.services.main1.getCharacteristic(Chars.Music);
+    this.events = await this.band.services.main1.getCharacteristic(
+      Chars.Events
+    );
     this.revision = await this.band.services.deviceInfo.getCharacteristic(
       Chars.Revision
     );
@@ -101,12 +103,12 @@ export class BandCharacteristics extends Base {
         await this.band.emit("authStateChange", this.band.state);
       }
     };
-    this.music.oncharacteristicvaluechanged = async () => {
-      console.log("Music Change", [
-        ...new Uint8Array(this.music.value?.buffer ?? new ArrayBuffer(0)),
+    this.events.oncharacteristicvaluechanged = async () => {
+      console.log("Events Change", [
+        ...new Uint8Array(this.events.value?.buffer ?? new ArrayBuffer(0)),
       ]);
-      if (!this.music.value) return;
-      const bt = this.music.value.getUint8(0);
+      if (!this.events.value) return;
+      const bt = this.events.value.getUint8(0);
       if (bt == 8) {
         await this.band.emit("findDevice");
         await this.band.writeDisplayCommand(0x14, 0x00, 0x00);
@@ -122,16 +124,16 @@ export class BandCharacteristics extends Base {
         await this.band.emit("alarmToggle");
       } else if (bt == 1) {
       } else if (bt == 20) {
-        if (this.music.value.getUint8(1) == 0)
+        if (this.events.value.getUint8(1) == 0)
           await this.band.emit(
             "workoutStart",
-            this.music.value.getUint8(3),
-            this.music.value.getUint8(2) == 1
+            this.events.value.getUint8(3),
+            this.events.value.getUint8(2) == 1
           );
       } else if (bt == 254) {
         const cmd =
-          this.music.value.byteLength > 1
-            ? this.music.value.getUint8(1)
+          this.events.value.byteLength > 1
+            ? this.events.value.getUint8(1)
             : undefined;
 
         if (cmd == 0xe0) {
@@ -239,7 +241,7 @@ export class BandCharacteristics extends Base {
     };
 
     await this.auth.startNotifications();
-    await this.music.startNotifications();
+    await this.events.startNotifications();
     await this.steps.startNotifications();
     await this.fetch.startNotifications();
     await this.activity.startNotifications();

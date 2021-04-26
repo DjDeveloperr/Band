@@ -1,5 +1,11 @@
 import type { Band } from "./band.ts";
 
 export class Base {
-  constructor(public band: Band) {}
+  band!: Band;
+
+  constructor(band: Band) {
+    Object.defineProperty(this, "band", {
+      value: band,
+    });
+  }
 }

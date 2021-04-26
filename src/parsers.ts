@@ -1,5 +1,3 @@
-import { Struct } from "../deps.ts";
-
 export enum BatteryStatus {
   Normal = "Normal",
   Charging = "Charging",

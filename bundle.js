@@ -1352,7 +1352,7 @@ const Chars = {
     HrdwRevision: 10791,
     Configuration: "00000003-0000-3512-2118-0009af100700",
     ChunkedTransfer: "00000020-0000-3512-2118-0009af100700",
-    Music: "00000010-0000-3512-2118-0009af100700",
+    Events: "00000010-0000-3512-2118-0009af100700",
     UserSettings: "00000008-0000-3512-2118-0009af100700",
     ActivityData: "00000005-0000-3512-2118-0009af100700",
     Fetch: "00000004-0000-3512-2118-0009af100700",
@@ -1532,7 +1532,9 @@ function bytesFromHex(hex) {
 class Base {
     band;
     constructor(band){
-        this.band = band;
+        Object.defineProperty(this, "band", {
+            value: band
+        });
     }
 }
 class BandServices extends Base {
@@ -1566,7 +1568,7 @@ class BandCharacteristics extends Base {
     fetch;
     activity;
     chunked;
-    music;
+    events;
     revision;
     hrdwRevision;
     battery;
@@ -1586,7 +1588,7 @@ class BandCharacteristics extends Base {
         this.fetch = await this.band.services.main1.getCharacteristic(Chars.Fetch);
         this.activity = await this.band.services.main1.getCharacteristic(Chars.ActivityData);
         this.chunked = await this.band.services.main1.getCharacteristic(Chars.ChunkedTransfer);
-        this.music = await this.band.services.main1.getCharacteristic(Chars.Music);
+        this.events = await this.band.services.main1.getCharacteristic(Chars.Events);
         this.revision = await this.band.services.deviceInfo.getCharacteristic(Chars.Revision);
         this.hrdwRevision = await this.band.services.deviceInfo.getCharacteristic(Chars.HrdwRevision);
         this.battery = await this.band.services.main1.getCharacteristic(Chars.Battery);
@@ -1654,12 +1656,12 @@ class BandCharacteristics extends Base {
                 await this.band.emit("authStateChange", this.band.state);
             }
         };
-        this.music.oncharacteristicvaluechanged = async ()=>{
-            console.log("Music Change", [
-                ...new Uint8Array(this.music.value?.buffer ?? new ArrayBuffer(0)), 
+        this.events.oncharacteristicvaluechanged = async ()=>{
+            console.log("Events Change", [
+                ...new Uint8Array(this.events.value?.buffer ?? new ArrayBuffer(0)), 
             ]);
-            if (!this.music.value) return;
-            const bt = this.music.value.getUint8(0);
+            if (!this.events.value) return;
+            const bt = this.events.value.getUint8(0);
             if (bt == 8) {
                 await this.band.emit("findDevice");
                 await this.band.writeDisplayCommand(20, 0, 0);
@@ -1675,9 +1677,9 @@ class BandCharacteristics extends Base {
                 await this.band.emit("alarmToggle");
             } else if (bt == 1) {
             } else if (bt == 20) {
-                if (this.music.value.getUint8(1) == 0) await this.band.emit("workoutStart", this.music.value.getUint8(3), this.music.value.getUint8(2) == 1);
+                if (this.events.value.getUint8(1) == 0) await this.band.emit("workoutStart", this.events.value.getUint8(3), this.events.value.getUint8(2) == 1);
             } else if (bt == 254) {
-                const cmd = this.music.value.byteLength > 1 ? this.music.value.getUint8(1) : undefined;
+                const cmd = this.events.value.byteLength > 1 ? this.events.value.getUint8(1) : undefined;
                 if (cmd == 224) {
                     await this.band.emit("musicFocusIn");
                     await this.band.updateMusic();
@@ -1783,7 +1785,7 @@ class BandCharacteristics extends Base {
             await this.band.emit("heartRateMeasure", data[1] ?? 0);
         };
         await this.auth.startNotifications();
-        await this.music.startNotifications();
+        await this.events.startNotifications();
         await this.steps.startNotifications();
         await this.fetch.startNotifications();
         await this.activity.startNotifications();
@@ -1843,8 +1845,8 @@ class Band extends EventEmitter {
         } else {
             this.ready = Promise.resolve(this);
         }
-        device.ongattserverdisconnected = ()=>{
-            this.emit("disconnect");
+        device.ongattserverdisconnected = async ()=>{
+            await this.emit("disconnect");
         };
     }
     async init() {
