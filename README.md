@@ -11,8 +11,9 @@ Interact with your Mi Band 4 right in browser using Web Bluetooth API! Based on 
 - Set music and receive music events
 - Heart rate measurement (realtime/onetime)
 - Setting alarms
+- Fetch Activity Data
 - Update Watchface
-- Update Firmware
+- Update Firmware (unsafe)
 
 ## License
 

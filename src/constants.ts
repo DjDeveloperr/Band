@@ -41,13 +41,16 @@ export const Chars = {
 
 export enum AlertType {
   None = 0,
-  Message = 1,
+  Email = 1,
   Phone = 2,
+  Call = 3,
+  CallNotif = 4,
+  Message = 5,
 }
 
 export enum MusicState {
-  Playing = 0,
-  Paused = 1,
+  Playing = 1,
+  Paused = 0,
 }
 
 export enum WeekDay {
@@ -59,4 +62,32 @@ export enum WeekDay {
   Saturday = 0x01 << 5,
   Sunday = 0x01 << 6,
   Everyday = 0x01 << 7,
+}
+
+export interface MusicInfo {
+  state: MusicState;
+  artist?: string;
+  album?: string;
+  track?: string;
+  position?: number;
+  duration?: number;
+  volume: number;
+}
+
+export enum AuthState {
+  None = "None",
+  KeySendFail = "Key Send Failed",
+  RequestRdnError = "Request Random Error",
+  Success = "Success",
+  EncryptionKeyFailed = "Encryption Key Failed",
+  UnknownError = "Unknown Error",
+}
+
+export enum WorkoutType {
+  OutdoorRunning = 1,
+  Treadmill,
+  Cycling,
+  Walking,
+  Freestyle,
+  PoolSwimming,
 }

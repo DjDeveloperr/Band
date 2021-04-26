@@ -1,1 +1,4 @@
 .vscode
+miband.fw
+watchface.bin
+server.ts

@@ -43,6 +43,38 @@
     .log-title {
       font-family: 'Courier New', Courier, monospace;
     }
+
+    #dfu {
+      position: absolute;
+      --width: 80%;
+      --height: 25px;
+      border-radius: 10px;
+      width: var(--width);
+      height: var(--height);
+      top: calc(50% - calc(var(--height) / 2));
+      left: calc(50% - calc(var(--width) / 2));
+      background-color: azure;
+    }
+
+    #dfu-text {
+      text-align: center;
+      position: absolute;
+      top: 0px;
+      left: 0px;
+      height: 100%;
+      width: 100%;
+      padding: 5px;
+    }
+
+    #dfu-prog {
+      position: absolute;
+      top: 0px;
+      left: 0px;
+      border-radius: 10px;
+      height: 100%;
+      background-color: chartreuse;
+      color: black;
+    }
   </style>
 </head>
 
@@ -50,6 +82,10 @@
   <button onclick="init()" id="init">Init</button>
   <div id="logs">
     <span>Logs</span>
+  </div>
+  <div id="dfu" style="display: none;">
+    <div id="dfu-prog" style="width: 0%;"></div>
+    <div id="dfu-text">0%</div>
   </div>
   <script src="./bundle.js"></script>
 </body>

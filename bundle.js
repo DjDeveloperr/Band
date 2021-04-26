@@ -1046,7 +1046,7 @@ class PureAES {
 function computeMessage(m) {
     return typeof m === "string" ? new TextEncoder().encode(m) : m;
 }
-class AES1 {
+class AES {
     ciper;
     constructor(key3, options){
         const computedKey = computeMessage(key3);
@@ -1364,14 +1364,17 @@ const Chars = {
 var AlertType;
 (function(AlertType1) {
     AlertType1[AlertType1["None"] = 0] = "None";
-    AlertType1[AlertType1["Message"] = 1] = "Message";
+    AlertType1[AlertType1["Email"] = 1] = "Email";
     AlertType1[AlertType1["Phone"] = 2] = "Phone";
+    AlertType1[AlertType1["Call"] = 3] = "Call";
+    AlertType1[AlertType1["CallNotif"] = 4] = "CallNotif";
+    AlertType1[AlertType1["Message"] = 5] = "Message";
 })(AlertType || (AlertType = {
 }));
 var MusicState;
 (function(MusicState1) {
-    MusicState1[MusicState1["Playing"] = 0] = "Playing";
-    MusicState1[MusicState1["Paused"] = 1] = "Paused";
+    MusicState1[MusicState1["Playing"] = 1] = "Playing";
+    MusicState1[MusicState1["Paused"] = 0] = "Paused";
 })(MusicState || (MusicState = {
 }));
 var WeekDay;
@@ -1385,6 +1388,26 @@ var WeekDay;
     WeekDay1[WeekDay1["Sunday"] = 64] = "Sunday";
     WeekDay1[WeekDay1["Everyday"] = 128] = "Everyday";
 })(WeekDay || (WeekDay = {
+}));
+var AuthState;
+(function(AuthState1) {
+    AuthState1["None"] = "None";
+    AuthState1["KeySendFail"] = "Key Send Failed";
+    AuthState1["RequestRdnError"] = "Request Random Error";
+    AuthState1["Success"] = "Success";
+    AuthState1["EncryptionKeyFailed"] = "Encryption Key Failed";
+    AuthState1["UnknownError"] = "Unknown Error";
+})(AuthState || (AuthState = {
+}));
+var WorkoutType;
+(function(WorkoutType1) {
+    WorkoutType1[WorkoutType1["OutdoorRunning"] = 1] = "OutdoorRunning";
+    WorkoutType1[WorkoutType1["Treadmill"] = 2] = "Treadmill";
+    WorkoutType1[WorkoutType1["Cycling"] = 3] = "Cycling";
+    WorkoutType1[WorkoutType1["Walking"] = 4] = "Walking";
+    WorkoutType1[WorkoutType1["Freestyle"] = 5] = "Freestyle";
+    WorkoutType1[WorkoutType1["PoolSwimming"] = 6] = "PoolSwimming";
+})(WorkoutType || (WorkoutType = {
 }));
 var BatteryStatus;
 (function(BatteryStatus1) {
@@ -1463,6 +1486,49 @@ function parseStatus(data) {
 }
 const decoder = new TextDecoder("utf-8");
 const encoder = new TextEncoder();
+function timeToDate(time) {
+    return new Date(`${time.month}/${time.date}/${time.year} ${time.hour}:${time.minute}`);
+}
+function dateToTime(date) {
+    return {
+        year: date.getFullYear(),
+        month: date.getMonth() + 1,
+        date: date.getDate(),
+        hour: date.getHours(),
+        minute: date.getMinutes()
+    };
+}
+function chunk(arr, size) {
+    const res = [];
+    let idx = 0;
+    arr.forEach((e)=>{
+        if (!res[idx]) res[idx] = [];
+        res[idx].push(e);
+        if (res[idx].length >= size) idx++;
+    });
+    return res;
+}
+function byteq(left, right) {
+    if (left.byteLength < right.length) return false;
+    let match = true;
+    right.forEach((e, i)=>{
+        if (!match) return;
+        if (e != left.getUint8(i)) match = false;
+    });
+    return match;
+}
+function bytesFromHex(hex) {
+    return hex.split("").reduce((resultArray, item, index)=>{
+        const chunkIndex = Math.floor(index / 2);
+        if (!resultArray[chunkIndex]) {
+            resultArray[chunkIndex] = [];
+        }
+        resultArray[chunkIndex].push(item);
+        return resultArray;
+    }, []).map((e)=>e.join("")
+    ).map((e)=>parseInt(e, 16)
+    );
+}
 class Base {
     band;
     constructor(band){
@@ -1492,15 +1558,6 @@ class BandServices extends Base {
         this.unknown2 = await this.band.gatt.getPrimaryService(Services.Unknown2);
         this.unknown3 = await this.band.gatt.getPrimaryService(Services.Unknown3);
     }
-}
-function byteq(left, right) {
-    if (left.byteLength < right.length) return false;
-    let match = true;
-    right.forEach((e, i)=>{
-        if (!match) return;
-        if (e != left.getUint8(i)) match = false;
-    });
-    return match;
 }
 class BandCharacteristics extends Base {
     auth;
@@ -1542,7 +1599,7 @@ class BandCharacteristics extends Base {
         this.firmWrite = await this.band.services.dfuFirmware.getCharacteristic(Chars.DfuFirmwareWrite);
         this.hz = await this.band.services.main1.getCharacteristic(Chars.Hz);
         this.sensor = await this.band.services.main1.getCharacteristic(Chars.Sensor);
-        this.auth.oncharacteristicvaluechanged = ()=>{
+        this.auth.oncharacteristicvaluechanged = async ()=>{
             console.log("Auth Change", [
                 ...new Uint8Array(this.auth.value?.buffer ?? new ArrayBuffer(0)), 
             ]);
@@ -1552,155 +1609,192 @@ class BandCharacteristics extends Base {
                 1,
                 1
             ])) {
-                this.band.requestRandomNumber();
+                await this.band.requestRandomNumber();
             } else if (byteq(this.auth.value, [
                 16,
                 1,
                 4
             ])) {
                 this.band.state = AuthState.KeySendFail;
-                this.band.emit("authStateChange", this.band.state);
+                await this.band.emit("authStateChange", this.band.state);
             } else if (byteq(this.auth.value, [
                 16,
                 2,
                 1
             ])) {
                 const random = new Uint8Array(this.auth.value.buffer.slice(3));
-                this.band.emit("authRandomNumber", random);
-                this.band.sendEncryptedNumber(random);
+                await this.band.emit("authRandomNumber", random);
+                await this.band.sendEncryptedNumber(random);
             } else if (byteq(this.auth.value, [
                 16,
                 2,
                 4
             ])) {
                 this.band.state = AuthState.RequestRdnError;
-                this.band.emit("authStateChange", this.band.state);
+                await this.band.emit("authStateChange", this.band.state);
             } else if (byteq(this.auth.value, [
                 16,
                 3,
                 1
             ])) {
                 this.band.state = AuthState.Success;
-                this.band.emit("authStateChange", this.band.state);
+                await this.band.emit("authStateChange", this.band.state);
             } else if (byteq(this.auth.value, [
                 16,
                 3,
                 4
             ])) {
                 this.band.state = AuthState.EncryptionKeyFailed;
-                this.band.emit("authStateChange", this.band.state);
+                await this.band.emit("authStateChange", this.band.state);
             } else if (byteq(this.auth.value, [
                 16,
                 3
             ])) {
                 this.band.state = AuthState.UnknownError;
-                this.band.emit("authStateChange", this.band.state);
+                await this.band.emit("authStateChange", this.band.state);
             }
         };
-        this.music.oncharacteristicvaluechanged = ()=>{
+        this.music.oncharacteristicvaluechanged = async ()=>{
             console.log("Music Change", [
                 ...new Uint8Array(this.music.value?.buffer ?? new ArrayBuffer(0)), 
             ]);
             if (!this.music.value) return;
             const bt = this.music.value.getUint8(0);
             if (bt == 8) {
-                this.band.emit("findDevice");
-                this.band.writeDisplayCommand(20, 0, 0);
+                await this.band.emit("findDevice");
+                await this.band.writeDisplayCommand(20, 0, 0);
+            } else if (bt == 7) {
+                await this.band.emit("callDismiss");
+            } else if (bt == 9) {
+                await this.band.emit("callSilent");
             } else if (bt == 15) {
-                this.band.emit("foundDevice");
-                this.band.writeDisplayCommand(20, 0, 1);
+                await this.band.emit("foundDevice");
+                await this.band.writeDisplayCommand(20, 0, 1);
             } else if (bt == 22) {
             } else if (bt == 10) {
-                this.band.emit("alarmToggle");
+                await this.band.emit("alarmToggle");
             } else if (bt == 1) {
             } else if (bt == 20) {
-                if (this.music.value.getUint8(1) == 0) this.band.emit("workoutStart", this.music.value.getUint8(3), this.music.value.getUint8(2) == 1);
+                if (this.music.value.getUint8(1) == 0) await this.band.emit("workoutStart", this.music.value.getUint8(3), this.music.value.getUint8(2) == 1);
             } else if (bt == 254) {
                 const cmd = this.music.value.byteLength > 1 ? this.music.value.getUint8(1) : undefined;
                 if (cmd == 224) {
-                    this.band.emit("musicFocusIn");
-                    this.band.updateMusic();
+                    await this.band.emit("musicFocusIn");
+                    await this.band.updateMusic();
                 } else if (cmd == 225) {
-                    this.band.emit("musicFocusOut");
+                    await this.band.emit("musicFocusOut");
                 } else if (cmd == 0) {
-                    this.band.emit("musicPlay");
+                    await this.band.emit("musicPlay");
                 } else if (cmd == 1) {
-                    this.band.emit("musicPause");
+                    await this.band.emit("musicPause");
                 } else if (cmd == 3) {
-                    this.band.emit("musicForward");
+                    await this.band.emit("musicForward");
                 } else if (cmd == 4) {
-                    this.band.emit("musicBackward");
+                    await this.band.emit("musicBackward");
                 } else if (cmd == 5) {
-                    this.band.emit("musicVolumeUp");
+                    await this.band.emit("musicVolumeUp");
                 } else if (cmd == 6) {
-                    this.band.emit("musicVolumeDown");
+                    await this.band.emit("musicVolumeDown");
                 }
             }
         };
-        this.fetch.oncharacteristicvaluechanged = ()=>{
+        this.fetch.oncharacteristicvaluechanged = async ()=>{
             console.log("Fetch Change", [
                 ...new Uint8Array(this.fetch.value?.buffer ?? new ArrayBuffer(0)), 
             ]);
+            if (!this.fetch.value) return;
+            const bytes = new Uint8Array(this.fetch.value.buffer);
+            if (byteq(this.fetch.value, [
+                16,
+                1,
+                1
+            ])) {
+                const [year] = Struct.unpack("<H", bytes.slice(7, 9));
+                const [month, date, hour, minute] = bytes.slice(9, 13);
+                const time = {
+                    year,
+                    minute,
+                    month,
+                    hour,
+                    date
+                };
+                this.band.firstTimestamp = time;
+                this.band.pkg = 0;
+                await this.band.emit("fetchStart", time);
+                await this.fetch.writeValueWithoutResponse(new Uint8Array([
+                    2
+                ]).buffer);
+            } else if (byteq(this.fetch.value, [
+                16,
+                2,
+                1
+            ])) {
+                await this.band.emit("fetchEnd");
+                this.band._fetching = false;
+            } else if (byteq(this.fetch.value, [
+                16,
+                1,
+                2
+            ])) {
+                await this.band.emit("error", "Already fetching Activity Data");
+            } else if (byteq(this.fetch.value, [
+                16,
+                2,
+                4
+            ])) {
+                await this.band.emit("info", "No more activity fetch possible");
+            }
         };
-        this.activity.oncharacteristicvaluechanged = ()=>{
+        this.activity.oncharacteristicvaluechanged = async ()=>{
             console.log("Activity Change", [
                 ...new Uint8Array(this.activity.value?.buffer ?? new ArrayBuffer(0)), 
             ]);
+            if (!this.activity.value) return;
+            const bytes = new Uint8Array(this.activity.value.buffer);
+            if (bytes.length % 4 === 1) {
+                if (!this.band.pkg) this.band.pkg = 0;
+                this.band.pkg++;
+                let i = 1;
+                while(i < bytes.length){
+                    const index = this.band.pkg * 4 + (i - 1) / 4;
+                    const ts = new Date(timeToDate(this.band.firstTimestamp).getTime() + 1000 * index);
+                    this.band.lastTimestamp = dateToTime(ts);
+                    const [category] = Struct.unpack("<B", [
+                        ...bytes.slice(i, i + 1), 
+                    ]);
+                    const [intensity, steps, heartRate] = bytes.slice(i + 1, i + 4);
+                    await this.band.emit("fetchData", {
+                        category,
+                        intensity,
+                        heartRate,
+                        steps
+                    }, this.band.lastTimestamp);
+                    i += 4;
+                }
+            }
         };
-        this.steps.oncharacteristicvaluechanged = ()=>{
+        this.steps.oncharacteristicvaluechanged = async ()=>{
             const status = parseStatus(this.steps.value);
-            this.band.emit("statusChange", status);
+            await this.band.emit("statusChange", status);
         };
-        this.heartMeasure.oncharacteristicvaluechanged = ()=>{
+        this.heartMeasure.oncharacteristicvaluechanged = async ()=>{
             if (!this.heartMeasure.value) return;
             const data = new Uint8Array(this.heartMeasure.value.buffer);
-            this.band.emit("heartRateMeasure", data[1] ?? 0);
+            await this.band.emit("heartRateMeasure", data[1] ?? 0);
         };
         await this.auth.startNotifications();
         await this.music.startNotifications();
+        await this.steps.startNotifications();
         await this.fetch.startNotifications();
         await this.activity.startNotifications();
-        await this.steps.startNotifications();
     }
-}
-var AuthState;
-(function(AuthState1) {
-    AuthState1["None"] = "None";
-    AuthState1["KeySendFail"] = "Key Send Failed";
-    AuthState1["RequestRdnError"] = "Request Random Error";
-    AuthState1["Success"] = "Success";
-    AuthState1["EncryptionKeyFailed"] = "Encryption Key Failed";
-    AuthState1["UnknownError"] = "Unknown Error";
-})(AuthState || (AuthState = {
-}));
-var WorkoutType;
-(function(WorkoutType1) {
-    WorkoutType1[WorkoutType1["OutdoorRunning"] = 1] = "OutdoorRunning";
-    WorkoutType1[WorkoutType1["Treadmill"] = 2] = "Treadmill";
-    WorkoutType1[WorkoutType1["Cycling"] = 3] = "Cycling";
-    WorkoutType1[WorkoutType1["Walking"] = 4] = "Walking";
-    WorkoutType1[WorkoutType1["Freestyle"] = 5] = "Freestyle";
-    WorkoutType1[WorkoutType1["PoolSwimming"] = 6] = "PoolSwimming";
-})(WorkoutType || (WorkoutType = {
-}));
-function bytesFromHex(hex) {
-    return hex.split("").reduce((resultArray, item, index)=>{
-        const chunkIndex = Math.floor(index / 2);
-        if (!resultArray[chunkIndex]) {
-            resultArray[chunkIndex] = [];
-        }
-        resultArray[chunkIndex].push(item);
-        return resultArray;
-    }, []).map((e)=>e.join("")
-    ).map((e)=>parseInt(e, 16)
-    );
 }
 class Band extends EventEmitter {
     device;
     gatt;
     key;
     static DEVICE_NAME = "Mi Smart Band 4";
-    static async connect(key) {
+    static async connect(key, gattConnect = true) {
         let device;
         const devices = await (navigator.bluetooth.getDevices || (()=>{
         }))() ?? [];
@@ -1721,8 +1815,8 @@ class Band extends EventEmitter {
             );
             if (deviceReq) device = deviceReq;
         }
-        const gatt = await device?.gatt?.connect().catch(()=>undefined
-        );
+        const gatt = gattConnect ? await device?.gatt?.connect().catch(()=>undefined
+        ) : device?.gatt;
         if (!gatt || !device) throw new Error("Failed to connect to Band");
         return new Band(device, gatt, key);
     }
@@ -1734,6 +1828,7 @@ class Band extends EventEmitter {
     };
     chars;
     state = AuthState.None;
+    ready;
     constructor(device, gatt, key5){
         super();
         this.device = device;
@@ -1741,6 +1836,13 @@ class Band extends EventEmitter {
         this.key = key5;
         this.services = new BandServices(this);
         this.chars = new BandCharacteristics(this);
+        if (!this.gatt.connected) {
+            this.ready = this.gatt.connect().then(()=>this.emit("connect")
+            ).then(()=>this
+            );
+        } else {
+            this.ready = Promise.resolve(this);
+        }
         device.ongattserverdisconnected = ()=>{
             this.emit("disconnect");
         };
@@ -1805,12 +1907,19 @@ class Band extends EventEmitter {
             ...encoder.encode(enc)
         ]).buffer);
     }
-    async sendAlert(type) {
-        await this.chars.alert.writeValue(new Uint8Array([
-            type
-        ]).buffer);
+    async sendAlert(...type) {
+        await this.chars.alert.writeValue(new Uint8Array(type).buffer);
     }
     async setCurrentTime(date) {
+        const d = new Date();
+        date = date ?? {
+            year: d.getFullYear(),
+            month: d.getMonth() + 1,
+            date: d.getDate(),
+            hours: d.getHours(),
+            minutes: d.getMinutes(),
+            seconds: d.getSeconds()
+        };
         await this.chars.currentTime.writeValueWithResponse(packDate(date).buffer);
     }
     async writeDisplayCommand(...cmd) {
@@ -1819,7 +1928,7 @@ class Band extends EventEmitter {
             ...cmd
         ]).buffer);
     }
-    async sendCustomAlert(type, title, msg) {
+    async sendCustomAlert(type = AlertType.None, title = "", msg = "") {
         await this.chars.customAlert.writeValue(new Uint8Array([
             type,
             1,
@@ -1827,8 +1936,21 @@ class Band extends EventEmitter {
             10,
             10,
             10,
-            ...encoder.encode(msg), 
+            ...encoder.encode(type === AlertType.Call ? "" : chunk(msg.split(""), 10).map((e)=>e.join("")
+            ).join("\n")), 
         ]).buffer);
+    }
+    async sendEmailNotification(title, msg) {
+        await this.sendCustomAlert(AlertType.Email, title, msg);
+    }
+    async sendCallNotification(title, msg) {
+        await this.sendCustomAlert(AlertType.CallNotif, title, msg);
+    }
+    async sendMessageNotification(title, msg) {
+        await this.sendCustomAlert(AlertType.Message, title, msg);
+    }
+    async sendCall(name) {
+        await this.sendCustomAlert(AlertType.Call, name, "");
     }
     async getStatus() {
         const value = await this.chars.steps.readValue();
@@ -1839,7 +1961,7 @@ class Band extends EventEmitter {
         let count = 0;
         while(remaining > 0){
             let copybytes = Math.min(remaining, 17);
-            let chunk = [];
+            let chunk1 = [];
             let flag = 0;
             if (remaining <= 17) {
                 flag |= 128;
@@ -1849,12 +1971,12 @@ class Band extends EventEmitter {
             } else if (count > 0) {
                 flag |= 64;
             }
-            chunk.push(0);
-            chunk.push(flag | type);
-            chunk.push(count & 255);
-            chunk.push(...data.slice(count * 17, count * 17 + copybytes));
+            chunk1.push(0);
+            chunk1.push(flag | type);
+            chunk1.push(count & 255);
+            chunk1.push(...data.slice(count * 17, count * 17 + copybytes));
             count += 1;
-            await this.chars.chunked.writeValueWithoutResponse(new Uint8Array(chunk).buffer);
+            await this.chars.chunked.writeValueWithoutResponse(new Uint8Array(chunk1).buffer);
             remaining -= copybytes;
         }
     }
@@ -1926,6 +2048,7 @@ class Band extends EventEmitter {
     }
     async dfuUpdate(type, bin) {
         const crc = parseInt(crc32(bin), 16);
+        await this.emit("dfuStart", type, bin.byteLength);
         await this.chars.firm.writeValueWithResponse(new Uint8Array([
             1,
             8,
@@ -1944,10 +2067,13 @@ class Band extends EventEmitter {
         let offset = 0;
         while(offset < bin.byteLength){
             const end = offset + 20;
-            const chunk = bin.slice(offset, end >= bin.byteLength ? bin.byteLength : end);
-            if (chunk.length === 0) continue;
-            await this.chars.firmWrite.writeValue(chunk.buffer);
-            offset += 20;
+            const offsetEnd = end >= bin.byteLength ? bin.byteLength : end;
+            const chunk1 = bin.slice(offset, offsetEnd);
+            if (chunk1.length === 0) continue;
+            await this.chars.firmWrite.writeValue(chunk1.buffer);
+            const diff = offsetEnd - offset;
+            offset += diff;
+            this.emit("dfuProgress", offset, bin.byteLength);
         }
         await this.chars.firm.writeValueWithResponse(new Uint8Array([
             0
@@ -1960,6 +2086,7 @@ class Band extends EventEmitter {
                 5
             ]).buffer);
         }
+        this.emit("dfuEnd");
     }
     updateWatchface(bin) {
         return this.dfuUpdate("watchface", bin);
@@ -2053,13 +2180,72 @@ class Band extends EventEmitter {
         ]).buffer);
         await this.chars.hz.stopNotifications();
     }
+    #fetching = false;
+    #fetchStart;
+    firstTimestamp;
+    lastTimestamp;
+    pkg = 0;
+    set _fetching(v) {
+        this.#fetching = v;
+    }
+    get fetching() {
+        return this.#fetching;
+    }
+    get fetchStart() {
+        return this.#fetchStart;
+    }
+    get fetchStartDate() {
+        const start = this.#fetchStart;
+        if (!start) return;
+        return timeToDate(start);
+    }
+    async startActivityFetch(start = {
+    }) {
+        this.pkg = 0;
+        start = Object.assign({
+            year: new Date().getFullYear(),
+            month: new Date().getMonth() + 1,
+            date: new Date().getDate(),
+            hour: 0,
+            minute: 0
+        }, start);
+        const command = [
+            1,
+            1
+        ];
+        const offset = await this.chars.currentTime.readValue().then((e)=>new Uint8Array(e.buffer).slice(9, 11)
+        );
+        command.push(...Struct.pack("<H", [
+            start.year
+        ]), start.month, start.date, start.hour, start.minute, ...offset);
+        await this.chars.fetch.writeValueWithoutResponse(new Uint8Array(command).buffer);
+        this.#fetching = true;
+        this.#fetchStart = start;
+    }
 }
 const log = (title, color, msg)=>document.getElementById("logs").innerHTML += `<br/><span class="log-title" style="color: ${color}">[${title}]</span> <span>${msg}</span>`
 ;
-const define = (name, value)=>Object.defineProperty(window, name, {
-        value
-    })
-;
+const define = (name, value)=>{
+    const obj = {
+    };
+    obj[name] = value;
+    Object.assign(window, obj);
+};
+const dfu = document.getElementById("dfu");
+const dfuProg = document.getElementById("dfu-prog");
+const dfuText = document.getElementById("dfu-text");
+function enableDfu() {
+    dfu.style.display = "block";
+}
+function disableDfu() {
+    dfu.style.display = "none";
+    dfuText.innerText = "0%";
+}
+function setDfuProg(prog) {
+    if (prog > 100) prog = 100;
+    dfuProg.style.width = `${prog}%`;
+    dfuText.innerText = `${Math.floor(prog)}%`;
+}
 const COLOR1 = "#0D993A";
 const COLOR2 = "#519ABA";
 const COLOR3 = "#CBBF38";
@@ -2082,7 +2268,11 @@ async function init(n = false) {
         if (typeof AES1 !== "undefined") {
             window.AES = AES1;
         }
-        const band1 = await Band.connect(localStorage.getItem("AUTH_KEY"));
+        const band1 = await Band.connect(localStorage.getItem("AUTH_KEY"), false);
+        band1.on("connect", ()=>{
+            logs.gatt("GATT Connected.");
+        });
+        await band1.ready;
         define("band", band1);
         logs.band("Connected to Band!");
         band1.on("disconnect", ()=>{
@@ -2105,15 +2295,23 @@ async function init(n = false) {
         });
         band1.on("musicPlay", ()=>{
             logs.info("Music Play");
+            band1.music.state = MusicState.Playing;
+            band1.updateMusic();
         });
         band1.on("musicPause", ()=>{
             logs.info("Music Pause");
+            band1.music.state = MusicState.Paused;
+            band1.updateMusic();
         });
         band1.on("musicVolumeUp", ()=>{
-            logs.info("Music Volume Up");
+            band1.music.volume += 5;
+            if (band1.music.volume > 100) band1.music.volume = 100;
+            band1.updateMusic();
         });
         band1.on("musicVolumeDown", ()=>{
-            logs.info("Music Volume Down");
+            band1.music.volume -= 5;
+            if (band1.music.volume < 0) band1.music.volume = 0;
+            band1.updateMusic();
         });
         band1.on("findDevice", ()=>{
             logs.info("Find device");
@@ -2130,6 +2328,38 @@ async function init(n = false) {
         band1.on("authStateChange", (s)=>{
             logs.auth("Auth State: " + s);
         });
+        band1.on("fetchStart", (t)=>{
+            logs.info(`Fetch Start (${timeToDate(t).toString()})`);
+        });
+        band1.on("fetchData", (d, t)=>{
+            console.log("Fetch", t, d);
+        });
+        band1.on("fetchEnd", ()=>{
+            logs.info("Fetch End");
+        });
+        band1.on("error", (e)=>{
+            logs.info(`Error: ${e}`);
+        });
+        band1.on("info", (e)=>{
+            logs.info(`Info: ${e}`);
+        });
+        band1.on("dfuStart", (type, len)=>{
+            logs.info(`DFU Start: ${type} (${len} bytes)`);
+            enableDfu();
+        });
+        band1.on("dfuProgress", (prog, total)=>{
+            setDfuProg(prog / total * 100);
+        });
+        band1.on("dfuEnd", ()=>{
+            disableDfu();
+            logs.info("DFU End");
+        });
+        band1.on("callDismiss", ()=>{
+            logs.info("Call Dismissed");
+        });
+        band1.on("callSilent", ()=>{
+            logs.info("Call Silent");
+        });
         await band1.init();
         logs.auth("Authorizing...");
         try {
@@ -2142,7 +2372,6 @@ async function init(n = false) {
         logs.info(`Hardware ${hrdwRevision}`);
         const battery = await band1.getBatteryInfo();
         logs.info(`Battery (${battery.status}): ${battery.level} (last level: ${battery.lastLevel})`);
-        const time = await band1.getCurrentTime();
     } catch (e) {
         if (!n) logs.error(e.toString());
     }

@@ -2,11 +2,13 @@
 
 import { EventEmitter, AES, Struct, crc32 } from "../deps.ts";
 import {
-  AlertType,
-  Chars,
   MusicState,
   Services,
   WeekDay,
+  AuthState,
+  WorkoutType,
+  MusicInfo,
+  AlertType,
 } from "./constants.ts";
 import {
   BatteryInfo,
@@ -17,284 +19,21 @@ import {
   parseStatus,
   StatusInfo,
 } from "./parsers.ts";
+import {
+  Time,
+  MAX_CHUNK,
+  ActivityData,
+  bytesFromHex,
+  encoder,
+  chunk,
+  decoder,
+  timeToDate,
+} from "./util.ts";
+import { BandServices } from "./services.ts";
+import { BandCharacteristics } from "./chars.ts";
 
-const decoder = new TextDecoder("utf-8");
-const encoder = new TextEncoder();
-const MAX_CHUNKLENGTH = 17;
-
-export class Base {
-  constructor(public band: Band) {}
-}
-
-export class BandServices extends Base {
-  main1!: BluetoothRemoteGATTService;
-  main2!: BluetoothRemoteGATTService;
-  heartrate!: BluetoothRemoteGATTService;
-  dfuFirmware!: BluetoothRemoteGATTService;
-  alert!: BluetoothRemoteGATTService;
-  alertNotification!: BluetoothRemoteGATTService;
-  deviceInfo!: BluetoothRemoteGATTService;
-  unknown1!: BluetoothRemoteGATTService;
-  unknown2!: BluetoothRemoteGATTService;
-  unknown3!: BluetoothRemoteGATTService;
-
-  async init() {
-    this.main1 = await this.band.gatt.getPrimaryService(Services.Main1);
-    this.main2 = await this.band.gatt.getPrimaryService(Services.Main2);
-    this.heartrate = await this.band.gatt.getPrimaryService(Services.HeartRate);
-    this.dfuFirmware = await this.band.gatt.getPrimaryService(
-      Services.DfuFirmware
-    );
-    this.alert = await this.band.gatt.getPrimaryService(Services.Alert);
-    this.deviceInfo = await this.band.gatt.getPrimaryService(
-      Services.DeviceInfo
-    );
-    this.alertNotification = await this.band.gatt.getPrimaryService(
-      Services.AlertNotification
-    );
-    this.unknown1 = await this.band.gatt.getPrimaryService(Services.Unknown1);
-    this.unknown2 = await this.band.gatt.getPrimaryService(Services.Unknown2);
-    this.unknown3 = await this.band.gatt.getPrimaryService(Services.Unknown3);
-  }
-}
-
-function byteq(left: DataView, right: number[]) {
-  if (left.byteLength < right.length) return false;
-
-  let match = true;
-  right.forEach((e, i) => {
-    if (!match) return;
-    if (e != left.getUint8(i)) match = false;
-  });
-  return match;
-}
-
-export class BandCharacteristics extends Base {
-  auth!: BluetoothRemoteGATTCharacteristic;
-  heartCtrl!: BluetoothRemoteGATTCharacteristic;
-  heartMeasure!: BluetoothRemoteGATTCharacteristic;
-  fetch!: BluetoothRemoteGATTCharacteristic;
-  activity!: BluetoothRemoteGATTCharacteristic;
-  chunked!: BluetoothRemoteGATTCharacteristic;
-  music!: BluetoothRemoteGATTCharacteristic;
-  revision!: BluetoothRemoteGATTCharacteristic;
-  hrdwRevision!: BluetoothRemoteGATTCharacteristic;
-  battery!: BluetoothRemoteGATTCharacteristic;
-  currentTime!: BluetoothRemoteGATTCharacteristic;
-  config!: BluetoothRemoteGATTCharacteristic;
-  alert!: BluetoothRemoteGATTCharacteristic;
-  customAlert!: BluetoothRemoteGATTCharacteristic;
-  steps!: BluetoothRemoteGATTCharacteristic;
-  firm!: BluetoothRemoteGATTCharacteristic;
-  firmWrite!: BluetoothRemoteGATTCharacteristic;
-  hz!: BluetoothRemoteGATTCharacteristic;
-  sensor!: BluetoothRemoteGATTCharacteristic;
-
-  async init() {
-    this.auth = await this.band.services.main2.getCharacteristic(Chars.Auth);
-    this.heartCtrl = await this.band.services.heartrate.getCharacteristic(
-      Chars.HeartRateControl
-    );
-    this.heartMeasure = await this.band.services.heartrate.getCharacteristic(
-      Chars.HeartRateMeasure
-    );
-    this.fetch = await this.band.services.main1.getCharacteristic(Chars.Fetch);
-    this.activity = await this.band.services.main1.getCharacteristic(
-      Chars.ActivityData
-    );
-    this.chunked = await this.band.services.main1.getCharacteristic(
-      Chars.ChunkedTransfer
-    );
-    this.music = await this.band.services.main1.getCharacteristic(Chars.Music);
-    this.revision = await this.band.services.deviceInfo.getCharacteristic(
-      Chars.Revision
-    );
-    this.hrdwRevision = await this.band.services.deviceInfo.getCharacteristic(
-      Chars.HrdwRevision
-    );
-    this.battery = await this.band.services.main1.getCharacteristic(
-      Chars.Battery
-    );
-    this.currentTime = await this.band.services.main1.getCharacteristic(
-      Chars.CurrentTime
-    );
-    this.config = await this.band.services.main1.getCharacteristic(
-      Chars.Configuration
-    );
-    this.steps = await this.band.services.main1.getCharacteristic(Chars.Steps);
-    this.alert = await this.band.services.alert.getCharacteristic(Chars.Alert);
-    this.customAlert = await this.band.services.alertNotification.getCharacteristic(
-      Chars.CustomAlert
-    );
-    this.firm = await this.band.services.dfuFirmware.getCharacteristic(
-      Chars.DfuFirmware
-    );
-    this.firmWrite = await this.band.services.dfuFirmware.getCharacteristic(
-      Chars.DfuFirmwareWrite
-    );
-    this.hz = await this.band.services.main1.getCharacteristic(Chars.Hz);
-    this.sensor = await this.band.services.main1.getCharacteristic(
-      Chars.Sensor
-    );
-
-    this.auth.oncharacteristicvaluechanged = () => {
-      console.log("Auth Change", [
-        ...new Uint8Array(this.auth.value?.buffer ?? new ArrayBuffer(0)),
-      ]);
-      if (!this.auth.value) return;
-
-      if (byteq(this.auth.value, [0x10, 0x01, 0x01])) {
-        this.band.requestRandomNumber();
-      } else if (byteq(this.auth.value, [0x10, 0x01, 0x04])) {
-        this.band.state = AuthState.KeySendFail;
-        this.band.emit("authStateChange", this.band.state);
-      } else if (byteq(this.auth.value, [0x10, 0x02, 0x01])) {
-        const random = new Uint8Array(this.auth.value.buffer.slice(3));
-        this.band.emit("authRandomNumber", random);
-        this.band.sendEncryptedNumber(random);
-      } else if (byteq(this.auth.value, [0x10, 0x02, 0x04])) {
-        this.band.state = AuthState.RequestRdnError;
-        this.band.emit("authStateChange", this.band.state);
-      } else if (byteq(this.auth.value, [0x10, 0x03, 0x01])) {
-        this.band.state = AuthState.Success;
-        this.band.emit("authStateChange", this.band.state);
-      } else if (byteq(this.auth.value, [0x10, 0x03, 0x04])) {
-        this.band.state = AuthState.EncryptionKeyFailed;
-        this.band.emit("authStateChange", this.band.state);
-      } else if (byteq(this.auth.value, [0x10, 0x03])) {
-        this.band.state = AuthState.UnknownError;
-        this.band.emit("authStateChange", this.band.state);
-      }
-    };
-    this.music.oncharacteristicvaluechanged = () => {
-      console.log("Music Change", [
-        ...new Uint8Array(this.music.value?.buffer ?? new ArrayBuffer(0)),
-      ]);
-      if (!this.music.value) return;
-      const bt = this.music.value.getUint8(0);
-      if (bt == 8) {
-        this.band.emit("findDevice");
-        this.band.writeDisplayCommand(0x14, 0x00, 0x00);
-      } else if (bt == 0x0f) {
-        this.band.emit("foundDevice");
-        this.band.writeDisplayCommand(0x14, 0x00, 0x01);
-      } else if (bt == 22) {
-      } else if (bt == 10) {
-        this.band.emit("alarmToggle");
-      } else if (bt == 1) {
-      } else if (bt == 20) {
-        if (this.music.value.getUint8(1) == 0)
-          this.band.emit(
-            "workoutStart",
-            this.music.value.getUint8(3),
-            this.music.value.getUint8(2) == 1
-          );
-      } else if (bt == 254) {
-        const cmd =
-          this.music.value.byteLength > 1
-            ? this.music.value.getUint8(1)
-            : undefined;
-
-        if (cmd == 0xe0) {
-          this.band.emit("musicFocusIn");
-          this.band.updateMusic();
-        } else if (cmd == 0xe1) {
-          this.band.emit("musicFocusOut");
-        } else if (cmd == 0x00) {
-          this.band.emit("musicPlay");
-        } else if (cmd == 0x01) {
-          this.band.emit("musicPause");
-        } else if (cmd == 0x03) {
-          this.band.emit("musicForward");
-        } else if (cmd == 0x04) {
-          this.band.emit("musicBackward");
-        } else if (cmd == 0x05) {
-          this.band.emit("musicVolumeUp");
-        } else if (cmd == 0x06) {
-          this.band.emit("musicVolumeDown");
-        }
-      }
-    };
-
-    this.fetch.oncharacteristicvaluechanged = () => {
-      console.log("Fetch Change", [
-        ...new Uint8Array(this.fetch.value?.buffer ?? new ArrayBuffer(0)),
-      ]);
-    };
-
-    this.activity.oncharacteristicvaluechanged = () => {
-      console.log("Activity Change", [
-        ...new Uint8Array(this.activity.value?.buffer ?? new ArrayBuffer(0)),
-      ]);
-    };
-
-    this.steps.oncharacteristicvaluechanged = () => {
-      const status = parseStatus(this.steps.value!);
-      // console.log("Status Change", status);
-      this.band.emit("statusChange", status);
-    };
-
-    this.heartMeasure.oncharacteristicvaluechanged = () => {
-      if (!this.heartMeasure.value) return;
-      const data = new Uint8Array(this.heartMeasure.value.buffer);
-      this.band.emit("heartRateMeasure", data[1] ?? 0);
-    };
-
-    await this.auth.startNotifications();
-    await this.music.startNotifications();
-    await this.fetch.startNotifications();
-    await this.activity.startNotifications();
-    await this.steps.startNotifications();
-  }
-}
-
-export interface MusicInfo {
-  state: MusicState;
-  artist?: string;
-  album?: string;
-  track?: string;
-  position?: number;
-  duration?: number;
-  volume?: number;
-}
-
-export enum AuthState {
-  None = "None",
-  KeySendFail = "Key Send Failed",
-  RequestRdnError = "Request Random Error",
-  Success = "Success",
-  EncryptionKeyFailed = "Encryption Key Failed",
-  UnknownError = "Unknown Error",
-}
-
-export enum WorkoutType {
-  OutdoorRunning = 1,
-  Treadmill,
-  Cycling,
-  Walking,
-  Freestyle,
-  PoolSwimming,
-}
-
-function bytesFromHex(hex: string) {
-  return hex
-    .split("")
-    .reduce((resultArray: any, item, index) => {
-      const chunkIndex = Math.floor(index / 2);
-
-      if (!resultArray[chunkIndex]) {
-        resultArray[chunkIndex] = [];
-      }
-
-      resultArray[chunkIndex].push(item);
-
-      return resultArray;
-    }, [])
-    .map((e: string[]) => e.join(""))
-    .map((e: string) => parseInt(e, 16));
-}
-
-export class Band extends EventEmitter<{
+export type BandEvents = {
+  connect: [];
   disconnect: [];
   init: [];
   authStateChange: [AuthState];
@@ -313,10 +52,22 @@ export class Band extends EventEmitter<{
   workoutStart: [WorkoutType, boolean];
   statusChange: [StatusInfo];
   heartRateMeasure: [number];
-}> {
+  dfuStart: [string, number];
+  dfuProgress: [number, number];
+  dfuEnd: [];
+  error: [string];
+  info: [string];
+  fetchStart: [Time];
+  fetchEnd: [];
+  fetchData: [ActivityData, Time];
+  callDismiss: [];
+  callSilent: [];
+};
+
+export class Band extends EventEmitter<BandEvents> {
   static DEVICE_NAME = "Mi Smart Band 4";
 
-  static async connect(key?: string) {
+  static async connect(key?: string, gattConnect = true) {
     let device: BluetoothDevice | undefined;
     const devices =
       (await (navigator.bluetooth.getDevices || (() => {}))()) ?? [];
@@ -339,7 +90,9 @@ export class Band extends EventEmitter<{
       if (deviceReq) device = deviceReq;
     }
 
-    const gatt = await device?.gatt?.connect().catch(() => undefined);
+    const gatt = gattConnect
+      ? await device?.gatt?.connect().catch(() => undefined)
+      : device?.gatt;
     if (!gatt || !device) throw new Error("Failed to connect to Band");
 
     return new Band(device, gatt, key);
@@ -353,6 +106,7 @@ export class Band extends EventEmitter<{
   };
   chars: BandCharacteristics;
   state: AuthState = AuthState.None;
+  ready: Promise<this>;
 
   constructor(
     public device: BluetoothDevice,
@@ -363,8 +117,17 @@ export class Band extends EventEmitter<{
     this.services = new BandServices(this);
     this.chars = new BandCharacteristics(this);
 
-    device.ongattserverdisconnected = () => {
-      this.emit("disconnect");
+    if (!this.gatt.connected) {
+      this.ready = this.gatt
+        .connect()
+        .then(() => this.emit("connect"))
+        .then(() => this);
+    } else {
+      this.ready = Promise.resolve(this);
+    }
+
+    device.ongattserverdisconnected = async () => {
+      await this.emit("disconnect");
     };
   }
 
@@ -428,11 +191,20 @@ export class Band extends EventEmitter<{
     );
   }
 
-  async sendAlert(type: AlertType) {
-    await this.chars.alert.writeValue(new Uint8Array([type]).buffer);
+  async sendAlert(...type: number[]) {
+    await this.chars.alert.writeValue(new Uint8Array(type).buffer);
   }
 
-  async setCurrentTime(date: DateTime) {
+  async setCurrentTime(date?: DateTime) {
+    const d = new Date();
+    date = date ?? {
+      year: d.getFullYear(),
+      month: d.getMonth() + 1,
+      date: d.getDate(),
+      hours: d.getHours(),
+      minutes: d.getMinutes(),
+      seconds: d.getSeconds(),
+    };
     await this.chars.currentTime.writeValueWithResponse(packDate(date).buffer);
   }
 
@@ -440,7 +212,11 @@ export class Band extends EventEmitter<{
     await this.chars.config.writeValue(new Uint8Array([0x06, ...cmd]).buffer);
   }
 
-  async sendCustomAlert(type: number, title: string, msg: string) {
+  async sendCustomAlert(
+    type: number = AlertType.None,
+    title: string = "",
+    msg: string = ""
+  ) {
     await this.chars.customAlert.writeValue(
       new Uint8Array([
         type,
@@ -449,9 +225,31 @@ export class Band extends EventEmitter<{
         0x0a,
         0x0a,
         0x0a,
-        ...encoder.encode(msg),
+        ...encoder.encode(
+          type === AlertType.Call
+            ? ""
+            : chunk(msg.split(""), 10)
+                .map((e) => e.join(""))
+                .join("\n")
+        ),
       ]).buffer
     );
+  }
+
+  async sendEmailNotification(title: string, msg: string) {
+    await this.sendCustomAlert(AlertType.Email, title, msg);
+  }
+
+  async sendCallNotification(title: string, msg: string) {
+    await this.sendCustomAlert(AlertType.CallNotif, title, msg);
+  }
+
+  async sendMessageNotification(title: string, msg: string) {
+    await this.sendCustomAlert(AlertType.Message, title, msg);
+  }
+
+  async sendCall(name: string) {
+    await this.sendCustomAlert(AlertType.Call, name, "");
   }
 
   async getStatus() {
@@ -464,10 +262,10 @@ export class Band extends EventEmitter<{
     let count = 0;
 
     while (remaining > 0) {
-      let copybytes = Math.min(remaining, MAX_CHUNKLENGTH);
+      let copybytes = Math.min(remaining, MAX_CHUNK);
       let chunk: number[] = [];
       let flag = 0;
-      if (remaining <= MAX_CHUNKLENGTH) {
+      if (remaining <= MAX_CHUNK) {
         flag |= 0x80;
         if (count == 0) {
           flag |= 0x40;
@@ -479,10 +277,7 @@ export class Band extends EventEmitter<{
       chunk.push(flag | type);
       chunk.push(count & 0xff);
       chunk.push(
-        ...data.slice(
-          count * MAX_CHUNKLENGTH,
-          count * MAX_CHUNKLENGTH + copybytes
-        )
+        ...data.slice(count * MAX_CHUNK, count * MAX_CHUNK + copybytes)
       );
       count += 1;
       await this.chars.chunked.writeValueWithoutResponse(
@@ -569,6 +364,7 @@ export class Band extends EventEmitter<{
 
   async dfuUpdate(type: "firmware" | "watchface", bin: Uint8Array) {
     const crc = parseInt(crc32(bin), 16);
+    await this.emit("dfuStart", type, bin.byteLength);
     await this.chars.firm.writeValueWithResponse(
       new Uint8Array([
         0x01,
@@ -584,13 +380,13 @@ export class Band extends EventEmitter<{
     let offset = 0;
     while (offset < bin.byteLength) {
       const end = offset + 20;
-      const chunk = bin.slice(
-        offset,
-        end >= bin.byteLength ? bin.byteLength : end
-      );
+      const offsetEnd = end >= bin.byteLength ? bin.byteLength : end;
+      const chunk = bin.slice(offset, offsetEnd);
       if (chunk.length === 0) continue;
       await this.chars.firmWrite.writeValue(chunk.buffer);
-      offset += 20;
+      const diff = offsetEnd - offset;
+      offset += diff;
+      this.emit("dfuProgress", offset, bin.byteLength);
     }
     await this.chars.firm.writeValueWithResponse(new Uint8Array([0x00]).buffer);
     await this.chars.firm.writeValueWithResponse(new Uint8Array([0x04]).buffer);
@@ -599,6 +395,7 @@ export class Band extends EventEmitter<{
         new Uint8Array([0x05]).buffer
       );
     }
+    this.emit("dfuEnd");
   }
 
   updateWatchface(bin: Uint8Array) {
@@ -688,4 +485,65 @@ export class Band extends EventEmitter<{
     );
     await this.chars.hz.stopNotifications();
   }
+
+  #fetching = false;
+  #fetchStart?: Time;
+  firstTimestamp?: Time;
+  lastTimestamp?: Time;
+  pkg: number = 0;
+
+  set _fetching(v: boolean) {
+    this.#fetching = v;
+  }
+
+  get fetching() {
+    return this.#fetching;
+  }
+
+  get fetchStart() {
+    return this.#fetchStart;
+  }
+
+  get fetchStartDate() {
+    const start = this.#fetchStart;
+    if (!start) return;
+    return timeToDate(start);
+  }
+
+  async startActivityFetch(start: Partial<Time> = {}) {
+    this.pkg = 0;
+    start = Object.assign(
+      {
+        year: new Date().getFullYear(),
+        month: new Date().getMonth() + 1,
+        date: new Date().getDate(),
+        hour: 0,
+        minute: 0,
+      },
+      start
+    );
+
+    const command: number[] = [0x01, 0x01];
+    const offset = await this.chars.currentTime
+      .readValue()
+      .then((e) => new Uint8Array(e.buffer).slice(9, 11));
+
+    command.push(
+      ...Struct.pack("<H", [start.year!]),
+      start.month!,
+      start.date!,
+      start.hour!,
+      start.minute!,
+      ...offset
+    );
+
+    await this.chars.fetch.writeValueWithoutResponse(
+      new Uint8Array(command).buffer
+    );
+    this.#fetching = true;
+    this.#fetchStart = start as any;
+  }
+}
+function MAX_CHUNKLENGTH(remaining: number, MAX_CHUNKLENGTH: any) {
+  throw new Error("Function not implemented.");
 }

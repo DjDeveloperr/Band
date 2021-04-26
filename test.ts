@@ -1,13 +1,36 @@
 /// <reference lib="dom"/>
-import { Band, WorkoutType } from "./src/band.ts";
+import { Band, timeToDate, WorkoutType } from "./mod.ts";
+import { MusicState } from "./src/constants.ts";
 
 const log = (title: string, color: string, msg: string) =>
   (document.getElementById(
     "logs"
   )!.innerHTML += `<br/><span class="log-title" style="color: ${color}">[${title}]</span> <span>${msg}</span>`);
 
-const define = (name: string, value: any) =>
-  Object.defineProperty(window, name, { value });
+const define = (name: string, value: any) => {
+  const obj: any = {};
+  obj[name] = value;
+  Object.assign(window, obj);
+};
+
+const dfu = document.getElementById("dfu")!;
+const dfuProg = document.getElementById("dfu-prog")!;
+const dfuText = document.getElementById("dfu-text")!;
+
+function enableDfu() {
+  dfu.style.display = "block";
+}
+
+function disableDfu() {
+  dfu.style.display = "none";
+  dfuText.innerText = "0%";
+}
+
+function setDfuProg(prog: number) {
+  if (prog > 100) prog = 100;
+  dfuProg.style.width = `${prog}%`;
+  dfuText.innerText = `${Math.floor(prog)}%`;
+}
 
 const COLOR1 = "#0D993A";
 const COLOR2 = "#519ABA";
@@ -34,7 +57,14 @@ async function init(n: boolean = false) {
       window.AES = AES1;
     }
 
-    const band = await Band.connect(localStorage.getItem("AUTH_KEY")!);
+    const band = await Band.connect(localStorage.getItem("AUTH_KEY")!, false);
+
+    band.on("connect", () => {
+      logs.gatt("GATT Connected.");
+    });
+
+    await band.ready;
+
     define("band", band);
 
     logs.band("Connected to Band!");
@@ -65,18 +95,28 @@ async function init(n: boolean = false) {
 
     band.on("musicPlay", () => {
       logs.info("Music Play");
+      band.music.state = MusicState.Playing;
+      band.updateMusic();
     });
 
     band.on("musicPause", () => {
       logs.info("Music Pause");
+      band.music.state = MusicState.Paused;
+      band.updateMusic();
     });
 
     band.on("musicVolumeUp", () => {
-      logs.info("Music Volume Up");
+      // logs.info("Music Volume Up");
+      band.music.volume += 5;
+      if (band.music.volume > 100) band.music.volume = 100;
+      band.updateMusic();
     });
 
     band.on("musicVolumeDown", () => {
-      logs.info("Music Volume Down");
+      // logs.info("Music Volume Down");
+      band.music.volume -= 5;
+      if (band.music.volume < 0) band.music.volume = 0;
+      band.updateMusic();
     });
 
     band.on("findDevice", () => {
@@ -103,6 +143,55 @@ async function init(n: boolean = false) {
       logs.auth("Auth State: " + s);
     });
 
+    band.on("fetchStart", (t) => {
+      logs.info(`Fetch Start (${timeToDate(t).toString()})`);
+    });
+
+    band.on("fetchData", (d, t) => {
+      // logs.info(
+      //   `Fetch (${timeToDate(t).toString()}): Category: ${
+      //     d.category
+      //   }, Intensity: ${d.intensity}, Steps: ${d.steps}, Heart Rate: ${
+      //     d.heartRate
+      //   }`
+      // );
+      console.log("Fetch", t, d);
+    });
+
+    band.on("fetchEnd", () => {
+      logs.info("Fetch End");
+    });
+
+    band.on("error", (e) => {
+      logs.info(`Error: ${e}`);
+    });
+
+    band.on("info", (e) => {
+      logs.info(`Info: ${e}`);
+    });
+
+    band.on("dfuStart", (type, len) => {
+      logs.info(`DFU Start: ${type} (${len} bytes)`);
+      enableDfu();
+    });
+
+    band.on("dfuProgress", (prog, total) => {
+      setDfuProg((prog / total) * 100);
+    });
+
+    band.on("dfuEnd", () => {
+      disableDfu();
+      logs.info("DFU End");
+    });
+
+    band.on("callDismiss", () => {
+      logs.info("Call Dismissed");
+    });
+
+    band.on("callSilent", () => {
+      logs.info("Call Silent");
+    });
+
     await band.init();
     logs.auth("Authorizing...");
     try {
@@ -119,7 +208,8 @@ async function init(n: boolean = false) {
     logs.info(
       `Battery (${battery.status}): ${battery.level} (last level: ${battery.lastLevel})`
     );
-    const time = await band.getCurrentTime();
+
+    // const time = await band.getCurrentTime();
     // logs.info(
     //   `Current Time: ${time.hours}:${time.minutes}:${time.seconds} - ${time.date}/${time.month}/${time.year} (Day ${time.day})`
     // );
