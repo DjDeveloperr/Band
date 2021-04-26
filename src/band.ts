@@ -544,6 +544,3 @@ export class Band extends EventEmitter<BandEvents> {
     this.#fetchStart = start as any;
   }
 }
-function MAX_CHUNKLENGTH(remaining: number, MAX_CHUNKLENGTH: any) {
-  throw new Error("Function not implemented.");
-}
