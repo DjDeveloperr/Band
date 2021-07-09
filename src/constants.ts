@@ -80,6 +80,7 @@ export enum AuthState {
   RequestRdnError = "Request Random Error",
   Success = "Success",
   EncryptionKeyFailed = "Encryption Key Failed",
+  IncorrectKey = "Incorrect Auth Key",
   UnknownError = "Unknown Error",
 }
 

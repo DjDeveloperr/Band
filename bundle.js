@@ -1396,6 +1396,7 @@ var AuthState;
     AuthState1["RequestRdnError"] = "Request Random Error";
     AuthState1["Success"] = "Success";
     AuthState1["EncryptionKeyFailed"] = "Encryption Key Failed";
+    AuthState1["IncorrectKey"] = "Incorrect Auth Key";
     AuthState1["UnknownError"] = "Unknown Error";
 })(AuthState || (AuthState = {
 }));
@@ -1529,6 +1530,7 @@ function bytesFromHex(hex) {
     ).map((e)=>parseInt(e, 16)
     );
 }
+console.log(new TextDecoder().decode(new Uint8Array(bytesFromHex(Deno.args[0]))));
 class Base {
     band;
     constructor(band){
@@ -1652,7 +1654,7 @@ class BandCharacteristics extends Base {
                 16,
                 3
             ])) {
-                this.band.state = AuthState.UnknownError;
+                this.band.state = this.auth.value.byteLength >= 3 && new Uint8Array(this.auth.value.buffer)[2] == 8 ? AuthState.IncorrectKey : AuthState.UnknownError;
                 await this.band.emit("authStateChange", this.band.state);
             }
         };
@@ -1855,7 +1857,7 @@ class Band extends EventEmitter {
         this.emit("init");
     }
     async authorize() {
-        if (!this.key) throw new Error("Auth Key not present");
+        if (!this.key) throw new Error("Auth Key not provided");
         const promise = new Promise((res, rej)=>{
             this.once("authStateChange", (state)=>{
                 if (state == AuthState.Success) res(true);
@@ -2136,7 +2138,9 @@ class Band extends EventEmitter {
         return this.#heartRateRealtime;
     }
     async startHeartRateRealtime() {
-        if (this.#heartRateRealtime) throw new Error("Heart Rate realtime already started");
+        if (this.#heartRateRealtime) {
+            throw new Error("Heart Rate realtime already started");
+        }
         this.#heartRateRealtime = true;
         await this.chars.heartCtrl.writeValueWithResponse(new Uint8Array([
             21,
@@ -2156,14 +2160,18 @@ class Band extends EventEmitter {
         ]).buffer);
         if (this.#heartRatePing) clearInterval(this.#heartRatePing);
         this.#heartRatePing = setInterval(()=>{
-            if (this.#heartRateRealtime !== true && this.#heartRatePing) return clearInterval(this.#heartRatePing);
+            if (this.#heartRateRealtime !== true && this.#heartRatePing) {
+                return clearInterval(this.#heartRatePing);
+            }
             this.chars.heartCtrl.writeValueWithResponse(new Uint8Array([
                 22
             ]).buffer);
         }, 12000);
     }
     async stopHeartRateRealtime() {
-        if (!this.#heartRateRealtime) throw new Error("Heart Rate realtime not even started");
+        if (!this.#heartRateRealtime) {
+            throw new Error("Heart Rate realtime not even started");
+        }
         this.#heartRateRealtime = false;
         if (this.#heartRatePing) clearInterval(this.#heartRatePing);
         await this.chars.heartCtrl.writeValueWithResponse(new Uint8Array([

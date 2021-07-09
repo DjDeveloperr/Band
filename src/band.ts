@@ -1,14 +1,14 @@
 /// <reference path="./types.d.ts"/>
 
-import { EventEmitter, AES, Struct, crc32 } from "../deps.ts";
+import { AES, crc32, EventEmitter, Struct } from "../deps.ts";
 import {
+  AlertType,
+  AuthState,
+  MusicInfo,
   MusicState,
   Services,
   WeekDay,
-  AuthState,
   WorkoutType,
-  MusicInfo,
-  AlertType,
 } from "./constants.ts";
 import {
   BatteryInfo,
@@ -20,13 +20,13 @@ import {
   StatusInfo,
 } from "./parsers.ts";
 import {
-  Time,
-  MAX_CHUNK,
   ActivityData,
   bytesFromHex,
-  encoder,
   chunk,
   decoder,
+  encoder,
+  MAX_CHUNK,
+  Time,
   timeToDate,
 } from "./util.ts";
 import { BandServices } from "./services.ts";
@@ -69,8 +69,8 @@ export class Band extends EventEmitter<BandEvents> {
 
   static async connect(key?: string, gattConnect = true) {
     let device: BluetoothDevice | undefined;
-    const devices =
-      (await (navigator.bluetooth.getDevices || (() => {}))()) ?? [];
+    const devices = (await (navigator.bluetooth.getDevices || (() => {}))()) ??
+      [];
     if (devices.length) {
       const found = devices.find((e) => e.name === Band.DEVICE_NAME);
       if (found) device = found;
@@ -111,7 +111,7 @@ export class Band extends EventEmitter<BandEvents> {
   constructor(
     public device: BluetoothDevice,
     public gatt: BluetoothRemoteGATTServer,
-    public key?: string
+    public key?: string,
   ) {
     super();
     this.services = new BandServices(this);
@@ -138,7 +138,7 @@ export class Band extends EventEmitter<BandEvents> {
   }
 
   async authorize(): Promise<true> {
-    if (!this.key) throw new Error("Auth Key not present");
+    if (!this.key) throw new Error("Auth Key not provided");
     const promise = new Promise((res, rej) => {
       this.once("authStateChange", (state) => {
         if (state == AuthState.Success) res(true);
@@ -151,7 +151,7 @@ export class Band extends EventEmitter<BandEvents> {
 
   async requestRandomNumber() {
     await this.chars.auth.writeValueWithoutResponse(
-      new Uint8Array([0x02, 0x00]).buffer
+      new Uint8Array([0x02, 0x00]).buffer,
     );
   }
 
@@ -187,7 +187,7 @@ export class Band extends EventEmitter<BandEvents> {
 
   async setEncoding(enc = "en_US") {
     await this.chars.config.writeValue(
-      new Uint8Array([6, 17, 0, ...encoder.encode(enc)]).buffer
+      new Uint8Array([6, 17, 0, ...encoder.encode(enc)]).buffer,
     );
   }
 
@@ -215,7 +215,7 @@ export class Band extends EventEmitter<BandEvents> {
   async sendCustomAlert(
     type: number = AlertType.None,
     title: string = "",
-    msg: string = ""
+    msg: string = "",
   ) {
     await this.chars.customAlert.writeValue(
       new Uint8Array([
@@ -226,13 +226,11 @@ export class Band extends EventEmitter<BandEvents> {
         0x0a,
         0x0a,
         ...encoder.encode(
-          type === AlertType.Call
-            ? ""
-            : chunk(msg.split(""), 10)
-                .map((e) => e.join(""))
-                .join("\n")
+          type === AlertType.Call ? "" : chunk(msg.split(""), 10)
+            .map((e) => e.join(""))
+            .join("\n"),
         ),
-      ]).buffer
+      ]).buffer,
     );
   }
 
@@ -277,11 +275,11 @@ export class Band extends EventEmitter<BandEvents> {
       chunk.push(flag | type);
       chunk.push(count & 0xff);
       chunk.push(
-        ...data.slice(count * MAX_CHUNK, count * MAX_CHUNK + copybytes)
+        ...data.slice(count * MAX_CHUNK, count * MAX_CHUNK + copybytes),
       );
       count += 1;
       await this.chars.chunked.writeValueWithoutResponse(
-        new Uint8Array(chunk).buffer
+        new Uint8Array(chunk).buffer,
       );
       remaining -= copybytes;
     }
@@ -342,7 +340,7 @@ export class Band extends EventEmitter<BandEvents> {
     days: WeekDay[] = [],
     enabled = true,
     snooze = true,
-    id = 0
+    id = 0,
   ) {
     let alarmTag = id;
     if (enabled) {
@@ -358,7 +356,7 @@ export class Band extends EventEmitter<BandEvents> {
     });
 
     await this.chars.config.writeValue(
-      Struct.pack("5B", [2, alarmTag, hour, minute, repitionMask]).buffer
+      Struct.pack("5B", [2, alarmTag, hour, minute, repitionMask]).buffer,
     );
   }
 
@@ -372,10 +370,10 @@ export class Band extends EventEmitter<BandEvents> {
         ...Struct.pack("<I", [bin.byteLength]).slice(0, 3),
         0x00,
         ...Struct.pack("<I", [crc]),
-      ]).buffer
+      ]).buffer,
     );
     await this.chars.firm.writeValueWithResponse(
-      new Uint8Array([0x03, 0x01]).buffer
+      new Uint8Array([0x03, 0x01]).buffer,
     );
     let offset = 0;
     while (offset < bin.byteLength) {
@@ -392,7 +390,7 @@ export class Band extends EventEmitter<BandEvents> {
     await this.chars.firm.writeValueWithResponse(new Uint8Array([0x04]).buffer);
     if (type === "firmware") {
       await this.chars.firm.writeValueWithResponse(
-        new Uint8Array([0x05]).buffer
+        new Uint8Array([0x05]).buffer,
       );
     }
     this.emit("dfuEnd");
@@ -409,18 +407,18 @@ export class Band extends EventEmitter<BandEvents> {
   async setHeartRateMonitorSleep(enabled = true, interval = 1) {
     await this.chars.heartMeasure.startNotifications();
     await this.chars.heartCtrl.writeValueWithResponse(
-      new Uint8Array([0x15, 0x00, 0x00]).buffer
+      new Uint8Array([0x15, 0x00, 0x00]).buffer,
     );
     await this.chars.heartCtrl.writeValueWithResponse(
-      new Uint8Array([0x14, 0x00]).buffer
+      new Uint8Array([0x14, 0x00]).buffer,
     );
     if (enabled) {
       await this.chars.heartCtrl.writeValueWithResponse(
-        new Uint8Array([0x15, 0x00, 0x01]).buffer
+        new Uint8Array([0x15, 0x00, 0x01]).buffer,
       );
       await this.chars.heartCtrl.writeValueWithResponse(
         new Uint8Array([0x14, ...new TextEncoder().encode(String(interval))])
-          .buffer
+          .buffer,
       );
     }
     await this.chars.heartMeasure.stopNotifications();
@@ -445,43 +443,46 @@ export class Band extends EventEmitter<BandEvents> {
   }
 
   async startHeartRateRealtime() {
-    if (this.#heartRateRealtime)
+    if (this.#heartRateRealtime) {
       throw new Error("Heart Rate realtime already started");
+    }
     this.#heartRateRealtime = true;
     await this.chars.heartCtrl.writeValueWithResponse(
-      new Uint8Array([0x15, 0x02, 0x00]).buffer
+      new Uint8Array([0x15, 0x02, 0x00]).buffer,
     );
     await this.chars.heartCtrl.writeValueWithResponse(
-      new Uint8Array([0x15, 0x01, 0x00]).buffer
+      new Uint8Array([0x15, 0x01, 0x00]).buffer,
     );
     await this.chars.heartMeasure.startNotifications();
     await this.chars.heartCtrl.writeValueWithResponse(
-      new Uint8Array([0x15, 0x01, 0x01]).buffer
+      new Uint8Array([0x15, 0x01, 0x01]).buffer,
     );
     if (this.#heartRatePing) clearInterval(this.#heartRatePing);
     this.#heartRatePing = setInterval(() => {
-      if (this.#heartRateRealtime !== true && this.#heartRatePing)
+      if (this.#heartRateRealtime !== true && this.#heartRatePing) {
         return clearInterval(this.#heartRatePing);
+      }
       this.chars.heartCtrl.writeValueWithResponse(
-        new Uint8Array([0x16]).buffer
+        new Uint8Array([0x16]).buffer,
       );
     }, 12000);
   }
 
   async stopHeartRateRealtime() {
-    if (!this.#heartRateRealtime)
+    if (!this.#heartRateRealtime) {
       throw new Error("Heart Rate realtime not even started");
+    }
     this.#heartRateRealtime = false;
     if (this.#heartRatePing) clearInterval(this.#heartRatePing);
     await this.chars.heartCtrl.writeValueWithResponse(
-      new Uint8Array([0x15, 0x01, 0x00]).buffer
+      new Uint8Array([0x15, 0x01, 0x00]).buffer,
     );
     await this.chars.heartCtrl.writeValueWithResponse(
-      new Uint8Array([0x15, 0x01, 0x00]).buffer
+      new Uint8Array([0x15, 0x01, 0x00]).buffer,
     );
     await this.chars.heartMeasure.stopNotifications();
     await this.chars.sensor.writeValueWithoutResponse(
-      new Uint8Array([0x03]).buffer
+      new Uint8Array([0x03]).buffer,
     );
     await this.chars.hz.stopNotifications();
   }
@@ -520,7 +521,7 @@ export class Band extends EventEmitter<BandEvents> {
         hour: 0,
         minute: 0,
       },
-      start
+      start,
     );
 
     const command: number[] = [0x01, 0x01];
@@ -534,11 +535,11 @@ export class Band extends EventEmitter<BandEvents> {
       start.date!,
       start.hour!,
       start.minute!,
-      ...offset
+      ...offset,
     );
 
     await this.chars.fetch.writeValueWithoutResponse(
-      new Uint8Array(command).buffer
+      new Uint8Array(command).buffer,
     );
     this.#fetching = true;
     this.#fetchStart = start as any;

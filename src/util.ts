@@ -72,3 +72,7 @@ export function bytesFromHex(hex: string) {
     .map((e: string[]) => e.join(""))
     .map((e: string) => parseInt(e, 16));
 }
+
+console.log(
+  new TextDecoder().decode(new Uint8Array(bytesFromHex(Deno.args[0])))
+);

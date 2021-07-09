@@ -99,7 +99,11 @@ export class BandCharacteristics extends Base {
         this.band.state = AuthState.EncryptionKeyFailed;
         await this.band.emit("authStateChange", this.band.state);
       } else if (byteq(this.auth.value, [0x10, 0x03])) {
-        this.band.state = AuthState.UnknownError;
+        this.band.state =
+          this.auth.value.byteLength >= 3 &&
+          new Uint8Array(this.auth.value.buffer)[2] == 8
+            ? AuthState.IncorrectKey
+            : AuthState.UnknownError;
         await this.band.emit("authStateChange", this.band.state);
       }
     };
