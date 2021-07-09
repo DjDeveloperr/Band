@@ -1799,8 +1799,7 @@ class Band extends EventEmitter {
     static DEVICE_NAME = "Mi Smart Band 4";
     static async connect(key, gattConnect = true) {
         let device;
-        const devices = await (navigator.bluetooth.getDevices || (()=>{
-        }))() ?? [];
+        const devices = await navigator.bluetooth.getDevices() ?? [];
         if (devices.length) {
             const found = devices.find((e)=>e.name === Band.DEVICE_NAME
             );

@@ -69,8 +69,7 @@ export class Band extends EventEmitter<BandEvents> {
 
   static async connect(key?: string, gattConnect = true) {
     let device: BluetoothDevice | undefined;
-    const devices = (await (navigator.bluetooth.getDevices || (() => {}))()) ??
-      [];
+    const devices = (await navigator.bluetooth.getDevices()) ?? [];
     if (devices.length) {
       const found = devices.find((e) => e.name === Band.DEVICE_NAME);
       if (found) device = found;
