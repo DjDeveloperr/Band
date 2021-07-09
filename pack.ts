@@ -2,7 +2,7 @@ export function pack(input: string, output: string) {
   const bin = Deno.readFileSync(input);
   Deno.writeTextFileSync(
     output,
-    `const BINARY=new Uint8Array([${bin.join(",")}]);export default BINARY;`
+    `const BINARY=new Uint8Array([${bin.join(",")}]);export default BINARY;`,
   );
 }
 

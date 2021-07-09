@@ -12,7 +12,7 @@ export interface Time {
 
 export function timeToDate(time: Time) {
   return new Date(
-    `${time.month}/${time.date}/${time.year} ${time.hour}:${time.minute}`
+    `${time.month}/${time.date}/${time.year} ${time.hour}:${time.minute}`,
   );
 }
 
@@ -72,7 +72,3 @@ export function bytesFromHex(hex: string) {
     .map((e: string[]) => e.join(""))
     .map((e: string) => parseInt(e, 16));
 }
-
-console.log(
-  new TextDecoder().decode(new Uint8Array(bytesFromHex(Deno.args[0])))
-);

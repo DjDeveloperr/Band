@@ -1530,7 +1530,6 @@ function bytesFromHex(hex) {
     ).map((e)=>parseInt(e, 16)
     );
 }
-console.log(new TextDecoder().decode(new Uint8Array(bytesFromHex(Deno.args[0]))));
 class Base {
     band;
     constructor(band){
