@@ -28,50 +28,51 @@ export class BandCharacteristics extends Base {
   async init() {
     this.auth = await this.band.services.main2.getCharacteristic(Chars.Auth);
     this.heartCtrl = await this.band.services.heartrate.getCharacteristic(
-      Chars.HeartRateControl
+      Chars.HeartRateControl,
     );
     this.heartMeasure = await this.band.services.heartrate.getCharacteristic(
-      Chars.HeartRateMeasure
+      Chars.HeartRateMeasure,
     );
     this.fetch = await this.band.services.main1.getCharacteristic(Chars.Fetch);
     this.activity = await this.band.services.main1.getCharacteristic(
-      Chars.ActivityData
+      Chars.ActivityData,
     );
     this.chunked = await this.band.services.main1.getCharacteristic(
-      Chars.ChunkedTransfer
+      Chars.ChunkedTransfer,
     );
     this.events = await this.band.services.main1.getCharacteristic(
-      Chars.Events
+      Chars.Events,
     );
     this.revision = await this.band.services.deviceInfo.getCharacteristic(
-      Chars.Revision
+      Chars.Revision,
     );
     this.hrdwRevision = await this.band.services.deviceInfo.getCharacteristic(
-      Chars.HrdwRevision
+      Chars.HrdwRevision,
     );
     this.battery = await this.band.services.main1.getCharacteristic(
-      Chars.Battery
+      Chars.Battery,
     );
     this.currentTime = await this.band.services.main1.getCharacteristic(
-      Chars.CurrentTime
+      Chars.CurrentTime,
     );
     this.config = await this.band.services.main1.getCharacteristic(
-      Chars.Configuration
+      Chars.Configuration,
     );
     this.steps = await this.band.services.main1.getCharacteristic(Chars.Steps);
     this.alert = await this.band.services.alert.getCharacteristic(Chars.Alert);
-    this.customAlert = await this.band.services.alertNotification.getCharacteristic(
-      Chars.CustomAlert
-    );
+    this.customAlert = await this.band.services.alertNotification
+      .getCharacteristic(
+        Chars.CustomAlert,
+      );
     this.firm = await this.band.services.dfuFirmware.getCharacteristic(
-      Chars.DfuFirmware
+      Chars.DfuFirmware,
     );
     this.firmWrite = await this.band.services.dfuFirmware.getCharacteristic(
-      Chars.DfuFirmwareWrite
+      Chars.DfuFirmwareWrite,
     );
     this.hz = await this.band.services.main1.getCharacteristic(Chars.Hz);
     this.sensor = await this.band.services.main1.getCharacteristic(
-      Chars.Sensor
+      Chars.Sensor,
     );
 
     this.auth.oncharacteristicvaluechanged = async () => {
@@ -99,11 +100,10 @@ export class BandCharacteristics extends Base {
         this.band.state = AuthState.EncryptionKeyFailed;
         await this.band.emit("authStateChange", this.band.state);
       } else if (byteq(this.auth.value, [0x10, 0x03])) {
-        this.band.state =
-          this.auth.value.byteLength >= 3 &&
-          new Uint8Array(this.auth.value.buffer)[2] == 8
-            ? AuthState.IncorrectKey
-            : AuthState.UnknownError;
+        this.band.state = this.auth.value.byteLength >= 3 &&
+            new Uint8Array(this.auth.value.buffer)[2] == 8
+          ? AuthState.IncorrectKey
+          : AuthState.UnknownError;
         await this.band.emit("authStateChange", this.band.state);
       }
     };
@@ -128,17 +128,17 @@ export class BandCharacteristics extends Base {
         await this.band.emit("alarmToggle");
       } else if (bt == 1) {
       } else if (bt == 20) {
-        if (this.events.value.getUint8(1) == 0)
+        if (this.events.value.getUint8(1) == 0) {
           await this.band.emit(
             "workoutStart",
             this.events.value.getUint8(3),
-            this.events.value.getUint8(2) == 1
+            this.events.value.getUint8(2) == 1,
           );
+        }
       } else if (bt == 254) {
-        const cmd =
-          this.events.value.byteLength > 1
-            ? this.events.value.getUint8(1)
-            : undefined;
+        const cmd = this.events.value.byteLength > 1
+          ? this.events.value.getUint8(1)
+          : undefined;
 
         if (cmd == 0xe0) {
           await this.band.emit("musicFocusIn");
@@ -183,7 +183,7 @@ export class BandCharacteristics extends Base {
         this.band.pkg = 0;
         await this.band.emit("fetchStart", time);
         await this.fetch.writeValueWithoutResponse(
-          new Uint8Array([0x02]).buffer
+          new Uint8Array([0x02]).buffer,
         );
       } else if (byteq(this.fetch.value, [0x10, 0x02, 0x01])) {
         await this.band.emit("fetchEnd");
@@ -210,7 +210,7 @@ export class BandCharacteristics extends Base {
         while (i < bytes.length) {
           const index = this.band.pkg! * 4 + (i - 1) / 4;
           const ts = new Date(
-            timeToDate(this.band.firstTimestamp!).getTime() + 1000 * index
+            timeToDate(this.band.firstTimestamp!).getTime() + 1000 * index,
           );
           this.band.lastTimestamp = dateToTime(ts);
           const [category] = Struct.unpack("<B", [
@@ -225,7 +225,7 @@ export class BandCharacteristics extends Base {
               heartRate,
               steps,
             },
-            this.band.lastTimestamp
+            this.band.lastTimestamp,
           );
           i += 4;
         }

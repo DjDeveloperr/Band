@@ -1,93 +1,93 @@
 <!DOCTYPE html>
 <html lang="en-US">
 
-<head>
+  <head>
 
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Mi Band - Web Bluetooth</title>
-  <style>
-    body {
-      background-color: #202124;
-      font-family: sans-serif;
-      overflow: hidden;
-    }
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mi Band - Web Bluetooth</title>
+    <style>
+      body {
+        background-color: #202124;
+        font-family: sans-serif;
+        overflow: hidden;
+      }
 
-    #init {
-      position: absolute;
-      left: 0px;
-      top: 0px;
-      background-color: #202124;
-      width: 100%;
-      height: 30px;
-      color: white;
-      text-align: center;
-      vertical-align: middle;
-      font-size: 24px;
-      border: none;
-      border-bottom: solid 1px white;
-    }
+      #init {
+        position: absolute;
+        left: 0px;
+        top: 0px;
+        background-color: #202124;
+        width: 100%;
+        height: 30px;
+        color: white;
+        text-align: center;
+        vertical-align: middle;
+        font-size: 24px;
+        border: none;
+        border-bottom: solid 1px white;
+      }
 
-    #logs {
-      position: absolute;
-      left: 0px;
-      top: 31px;
-      width: calc(100% - 8px);
-      font-size: 22px;
-      height: calc(100% - 39px);
-      color: white;
-      padding: 4px;
-      overflow-x: hidden;
-      overflow-y: scroll;
-    }
+      #logs {
+        position: absolute;
+        left: 0px;
+        top: 31px;
+        width: calc(100% - 8px);
+        font-size: 22px;
+        height: calc(100% - 39px);
+        color: white;
+        padding: 4px;
+        overflow-x: hidden;
+        overflow-y: scroll;
+      }
 
-    .log-title {
-      font-family: 'Courier New', Courier, monospace;
-    }
+      .log-title {
+        font-family: 'Courier New', Courier, monospace;
+      }
 
-    #dfu {
-      position: absolute;
-      --width: 80%;
-      --height: 25px;
-      border-radius: 10px;
-      width: var(--width);
-      height: var(--height);
-      top: calc(50% - calc(var(--height) / 2));
-      left: calc(50% - calc(var(--width) / 2));
-      background-color: azure;
-    }
+      #dfu {
+        position: absolute;
+        --width: 80%;
+        --height: 25px;
+        border-radius: 10px;
+        width: var(--width);
+        height: var(--height);
+        top: calc(50% - calc(var(--height) / 2));
+        left: calc(50% - calc(var(--width) / 2));
+        background-color: azure;
+      }
 
-    #dfu-text {
-      text-align: center;
-      position: absolute;
-      top: 0px;
-      left: 0px;
-      height: 100%;
-      width: 100%;
-      padding: 5px;
-    }
+      #dfu-text {
+        text-align: center;
+        position: absolute;
+        top: 0px;
+        left: 0px;
+        height: 100%;
+        width: 100%;
+        padding: 5px;
+      }
 
-    #dfu-prog {
-      position: absolute;
-      top: 0px;
-      left: 0px;
-      border-radius: 10px;
-      height: 100%;
-      background-color: chartreuse;
-      color: black;
-    }
-  </style>
-</head>
+      #dfu-prog {
+        position: absolute;
+        top: 0px;
+        left: 0px;
+        border-radius: 10px;
+        height: 100%;
+        background-color: chartreuse;
+        color: black;
+      }
+    </style>
+  </head>
 
-<body>
-  <button onclick="init()" id="init">Init</button>
-  <div id="logs">
-    <span>Logs</span>
-  </div>
-  <div id="dfu" style="display: none;">
-    <div id="dfu-prog" style="width: 0%;"></div>
-    <div id="dfu-text">0%</div>
-  </div>
-  <script src="./bundle.js"></script>
-</body>
+  <body>
+    <button onclick="init()" id="init">Init</button>
+    <div id="logs">
+      <span>Logs</span>
+    </div>
+    <div id="dfu" style="display: none;">
+      <div id="dfu-prog" style="width: 0%;"></div>
+      <div id="dfu-text">0%</div>
+    </div>
+    <script src="./bundle.js"></script>
+  </body>
 
 </html>
