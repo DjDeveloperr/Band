@@ -68,8 +68,16 @@ export class Band extends EventEmitter<BandEvents> {
   static DEVICE_NAME = "Mi Smart Band 4";
 
   static async connect(key?: string, gattConnect = true) {
+    if (!("bluetooth" in navigator)) {
+      throw new Error(
+        "Web Bluetooth is not supported by this browser! Use a modern Chromium based brower I guess.",
+      );
+    }
     let device: BluetoothDevice | undefined;
-    const devices = (await navigator.bluetooth.getDevices()) ?? [];
+    let devices: BluetoothDevice[] = [];
+    if (typeof navigator.bluetooth.getDevices === "function") {
+      devices = (await navigator.bluetooth.getDevices()) ?? [];
+    }
     if (devices.length) {
       const found = devices.find((e) => e.name === Band.DEVICE_NAME);
       if (found) device = found;
