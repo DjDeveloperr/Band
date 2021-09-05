@@ -2467,16 +2467,19 @@ fetch("http://localhost:6969/firmware").then((e)=>e.arrayBuffer()
 ).then((e)=>new Uint8Array(e)
 ).then((e)=>{
     define("fw", e);
+}).catch(()=>{
 });
 fetch("http://localhost:6969/watchface").then((e)=>e.arrayBuffer()
 ).then((e)=>new Uint8Array(e)
 ).then((e)=>{
     define("wf", e);
+}).catch(()=>{
 });
 fetch("http://localhost:6969/res").then((e)=>e.arrayBuffer()
 ).then((e)=>new Uint8Array(e)
 ).then((e)=>{
     define("res", e);
+}).catch(()=>{
 });
 init(true).catch(()=>{
 });
