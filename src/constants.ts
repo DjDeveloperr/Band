@@ -37,6 +37,12 @@ export const Chars = {
   Age: "00002a80-0000-1000-8000-00805f9b34fb",
   DfuFirmware: "00001531-0000-3512-2118-0009af100700",
   DfuFirmwareWrite: "00001532-0000-3512-2118-0009af100700",
+  Unknown1: "0000000E-0000-3512-2118-0009af100700",
+  Unknown2: "0000000F-0000-3512-2118-0009af100700",
+  Unknown3: "00000011-0000-3512-2118-0009af100700",
+  Audio: "00000012-0000-3512-2118-0009af100700", // ??
+  AudioData: "00000013-0000-3512-2118-0009af100700", // ??
+  Unknown6: "0000FEC1-0000-3512-2118-0009af100700",
 };
 
 export enum AlertType {
@@ -91,4 +97,13 @@ export enum WorkoutType {
   Walking,
   Freestyle,
   PoolSwimming,
+}
+
+export enum DisplayItem {
+  Clock = 0x01,
+  Steps = 0x02,
+  Distance = 0x04,
+  Calories = 0x08,
+  HeartRate = 0x10,
+  Battery = 0x20,
 }

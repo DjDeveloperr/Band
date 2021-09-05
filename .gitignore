@@ -1,6 +1,3 @@
-.vscode
-miband.fw
-watchface.bin
-server.ts
-ext
-band.fw
+.vscode/
+ext/
+re/

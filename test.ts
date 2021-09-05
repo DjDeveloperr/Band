@@ -1,11 +1,24 @@
 /// <reference lib="dom"/>
+
 import { Band, timeToDate, WorkoutType } from "./mod.ts";
 import { MusicState } from "./src/constants.ts";
 
-const log = (title: string, color: string, msg: string) =>
-  (document.getElementById(
-    "logs"
-  )!.innerHTML += `<br/><span class="log-title" style="color: ${color}">[${title}]</span> <span>${msg}</span>`);
+const LOGS = document.getElementById(
+  "logs",
+)!;
+
+const log = (
+  title: string,
+  color: string,
+  msg: string,
+) => {
+  const isOnEnd = true; // Math.abs(LOGS.scrollHeight - LOGS.scrollTop) < 5; // TODO: How?
+  LOGS.innerHTML +=
+    `<span class="log-title" style="color: ${color}">[${title}]</span> <span>${msg}</span><br/>`;
+  if (isOnEnd) {
+    LOGS.scrollTop = LOGS.scrollHeight;
+  }
+};
 
 const define = (name: string, value: any) => {
   const obj: any = {};
@@ -57,7 +70,10 @@ async function init(n: boolean = false) {
       window.AES = AES1;
     }
 
-    const band = await Band.connect(localStorage.getItem("AUTH_KEY")!, false);
+    const key = localStorage.getItem("AUTH_KEY");
+    if (!key) logs.info("Auth Key not found in local storage.");
+
+    const band = await Band.connect(key!, false);
 
     band.on("connect", () => {
       logs.gatt("GATT Connected.");
@@ -135,7 +151,7 @@ async function init(n: boolean = false) {
       logs.info(
         "Workout Start: " +
           WorkoutType[type] +
-          (loc ? " (looking for location)" : "")
+          (loc ? " (looking for location)" : ""),
       );
     });
 
@@ -206,16 +222,52 @@ async function init(n: boolean = false) {
 
     const battery = await band.getBatteryInfo();
     logs.info(
-      `Battery (${battery.status}): ${battery.level} (last level: ${battery.lastLevel})`
+      `Battery (${battery.status}): ${battery.level} (last level: ${battery.lastLevel})`,
     );
 
-    // const time = await band.getCurrentTime();
-    // logs.info(
-    //   `Current Time: ${time.hours}:${time.minutes}:${time.seconds} - ${time.date}/${time.month}/${time.year} (Day ${time.day})`
-    // );
+    const time = await band.getCurrentTime();
+    logs.info(
+      `Current Time: ${time.hours}:${time.minutes}:${time.seconds} - ${time.date}/${time.month}/${time.year} (Day ${time.day})`,
+    );
   } catch (e) {
     if (!n) logs.error(e.toString());
   }
 }
+
+function addKey() {
+  const key = localStorage.getItem("AUTH_KEY");
+  const newKey = prompt(
+    `Enter Auth Key, or keep empty to remove.\nIf adding new key, this will be stored persistently, unless removed.${
+      key
+        ? "\nNote: A key already exists in local storage, adding new one will overwrite it"
+        : ""
+    }`,
+  );
+  if (newKey) {
+    localStorage.setItem("AUTH_KEY", newKey);
+  } else {
+    localStorage.removeItem("AUTH_KEY");
+  }
+}
+
+define("addKey", addKey);
+
+fetch("http://localhost:6969/firmware").then((e) => e.arrayBuffer()).then((e) =>
+  new Uint8Array(e)
+).then((e) => {
+  define("fw", e);
+});
+
+fetch("http://localhost:6969/watchface").then((e) => e.arrayBuffer()).then((
+  e,
+) => new Uint8Array(e)).then((e) => {
+  define("wf", e);
+});
+
+fetch("http://localhost:6969/res").then((e) => e.arrayBuffer()).then((
+  e,
+) => new Uint8Array(e)).then((e) => {
+  define("res", e);
+});
 
 init(true).catch(() => {});

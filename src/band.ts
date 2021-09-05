@@ -211,6 +211,53 @@ export class Band extends EventEmitter<BandEvents> {
     await this.chars.config.writeValue(new Uint8Array([0x06, ...cmd]).buffer);
   }
 
+  async setDisplayOnLiftWrist(display: boolean) {
+    await this.writeDisplayCommand(0x05, 0x00, display ? 0x01 : 0x00);
+  }
+
+  async scheduleDisplayOnLiftWrist(
+    start: [hour: number, minute: number],
+    end: [hour: number, minute: number],
+  ) {
+    const buf = new Uint8Array([0x05, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00]);
+    buf[3] = start[0];
+    buf[4] = start[1];
+    buf[5] = end[0];
+    buf[6] = end[1];
+    await this.writeDisplayCommand(...buf);
+  }
+
+  async setGoalNotification(enabled: boolean) {
+    await this.writeDisplayCommand(0x06, 0x00, enabled ? 0x01 : 0x00);
+  }
+
+  async setDisplayCaller(enabled: boolean) {
+    await this.writeDisplayCommand(0x10, 0x00, 0x00, enabled ? 0x01 : 0x00);
+  }
+
+  async setDistanceUnit(unit: "metric" | "imperial") {
+    await this.writeDisplayCommand(0x03, 0x00, unit == "metric" ? 0x00 : 0x01);
+  }
+
+  async setDisconnectNotification(enabled: boolean) {
+    await this.writeDisplayCommand(
+      0x0c,
+      0x00,
+      enabled ? 0x01 : 0x00,
+      0,
+      0,
+      0,
+      0,
+    );
+  }
+
+  async setTimeFormat(fmt: 12 | 24) {
+    if (fmt !== 12 && fmt !== 24) {
+      throw new Error("Invalid format, must be 12 or 24");
+    }
+    await this.writeDisplayCommand(0x02, 0x00, fmt == 12 ? 0x00 : 0x01);
+  }
+
   async sendCustomAlert(
     type: number = AlertType.None,
     title: string = "",
@@ -359,15 +406,17 @@ export class Band extends EventEmitter<BandEvents> {
     );
   }
 
-  async dfuUpdate(type: "firmware" | "watchface", bin: Uint8Array) {
+  async dfuUpdate(
+    type: "firmware" | "watchface" | "resource",
+    bin: Uint8Array,
+  ) {
     const crc = parseInt(crc32(bin), 16);
     await this.emit("dfuStart", type, bin.byteLength);
     await this.chars.firm.writeValueWithResponse(
       new Uint8Array([
         0x01,
-        0x08,
-        ...Struct.pack("<I", [bin.byteLength]).slice(0, 3),
-        0x00,
+        // 0x08,
+        ...Struct.pack("<I", [bin.byteLength]),
         ...Struct.pack("<I", [crc]),
       ]).buffer,
     );

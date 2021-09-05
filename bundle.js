@@ -1359,7 +1359,13 @@ const Chars = {
     CurrentTime: "00002a2b-0000-1000-8000-00805f9b34fb",
     Age: "00002a80-0000-1000-8000-00805f9b34fb",
     DfuFirmware: "00001531-0000-3512-2118-0009af100700",
-    DfuFirmwareWrite: "00001532-0000-3512-2118-0009af100700"
+    DfuFirmwareWrite: "00001532-0000-3512-2118-0009af100700",
+    Unknown1: "0000000E-0000-3512-2118-0009af100700",
+    Unknown2: "0000000F-0000-3512-2118-0009af100700",
+    Unknown3: "00000011-0000-3512-2118-0009af100700",
+    Unknown4: "00000012-0000-3512-2118-0009af100700",
+    Unknown5: "00000013-0000-3512-2118-0009af100700",
+    Unknown6: "0000FEC1-0000-3512-2118-0009af100700"
 };
 var AlertType;
 (function(AlertType1) {
@@ -1678,7 +1684,9 @@ class BandCharacteristics extends Base {
                 await this.band.emit("alarmToggle");
             } else if (bt == 1) {
             } else if (bt == 20) {
-                if (this.events.value.getUint8(1) == 0) await this.band.emit("workoutStart", this.events.value.getUint8(3), this.events.value.getUint8(2) == 1);
+                if (this.events.value.getUint8(1) == 0) {
+                    await this.band.emit("workoutStart", this.events.value.getUint8(3), this.events.value.getUint8(2) == 1);
+                }
             } else if (bt == 254) {
                 const cmd = this.events.value.byteLength > 1 ? this.events.value.getUint8(1) : undefined;
                 if (cmd == 224) {
@@ -2056,8 +2064,7 @@ class Band extends EventEmitter {
             8,
             ...Struct.pack("<I", [
                 bin.byteLength
-            ]).slice(0, 3),
-            0,
+            ]),
             ...Struct.pack("<I", [
                 crc
             ]), 
@@ -2231,8 +2238,14 @@ class Band extends EventEmitter {
         this.#fetchStart = start;
     }
 }
-const log = (title, color, msg)=>document.getElementById("logs").innerHTML += `<br/><span class="log-title" style="color: ${color}">[${title}]</span> <span>${msg}</span>`
-;
+const LOGS = document.getElementById("logs");
+const log = (title, color, msg)=>{
+    const isOnEnd = true;
+    LOGS.innerHTML += `<span class="log-title" style="color: ${color}">[${title}]</span> <span>${msg}</span><br/>`;
+    if (true) {
+        LOGS.scrollTop = LOGS.scrollHeight;
+    }
+};
 const define = (name, value)=>{
     const obj = {
     };
@@ -2276,7 +2289,9 @@ async function init(n = false) {
         if (typeof AES1 !== "undefined") {
             window.AES = AES1;
         }
-        const band1 = await Band.connect(localStorage.getItem("AUTH_KEY"), false);
+        const key6 = localStorage.getItem("AUTH_KEY");
+        if (!key6) logs.info("Auth Key not found in local storage.");
+        const band1 = await Band.connect(key6, false);
         band1.on("connect", ()=>{
             logs.gatt("GATT Connected.");
         });
@@ -2380,9 +2395,36 @@ async function init(n = false) {
         logs.info(`Hardware ${hrdwRevision}`);
         const battery = await band1.getBatteryInfo();
         logs.info(`Battery (${battery.status}): ${battery.level} (last level: ${battery.lastLevel})`);
+        const time = await band1.getCurrentTime();
+        logs.info(`Current Time: ${time.hours}:${time.minutes}:${time.seconds} - ${time.date}/${time.month}/${time.year} (Day ${time.day})`);
     } catch (e) {
         if (!n) logs.error(e.toString());
     }
 }
+function addKey() {
+    const key6 = localStorage.getItem("AUTH_KEY");
+    const newKey = prompt(`Enter Auth Key, or keep empty to remove.\nIf adding new key, this will be stored persistently, unless removed.${key6 ? "\nNote: A key already exists in local storage, adding new one will overwrite it" : ""}`);
+    if (newKey) {
+        localStorage.setItem("AUTH_KEY", newKey);
+    } else {
+        localStorage.removeItem("AUTH_KEY");
+    }
+}
+define("addKey", addKey);
+fetch("http://localhost:6969/firmware").then((e)=>e.arrayBuffer()
+).then((e)=>new Uint8Array(e)
+).then((e)=>{
+    define("fw", e);
+});
+fetch("http://localhost:6969/watchface").then((e)=>e.arrayBuffer()
+).then((e)=>new Uint8Array(e)
+).then((e)=>{
+    define("wf", e);
+});
+fetch("http://localhost:6969/res").then((e)=>e.arrayBuffer()
+).then((e)=>new Uint8Array(e)
+).then((e)=>{
+    define("res", e);
+});
 init(true).catch(()=>{
 });
