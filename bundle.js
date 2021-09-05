@@ -1363,8 +1363,8 @@ const Chars = {
     Unknown1: "0000000E-0000-3512-2118-0009af100700",
     Unknown2: "0000000F-0000-3512-2118-0009af100700",
     Unknown3: "00000011-0000-3512-2118-0009af100700",
-    Unknown4: "00000012-0000-3512-2118-0009af100700",
-    Unknown5: "00000013-0000-3512-2118-0009af100700",
+    Audio: "00000012-0000-3512-2118-0009af100700",
+    AudioData: "00000013-0000-3512-2118-0009af100700",
     Unknown6: "0000FEC1-0000-3512-2118-0009af100700"
 };
 var AlertType;
@@ -1415,6 +1415,16 @@ var WorkoutType;
     WorkoutType1[WorkoutType1["Freestyle"] = 5] = "Freestyle";
     WorkoutType1[WorkoutType1["PoolSwimming"] = 6] = "PoolSwimming";
 })(WorkoutType || (WorkoutType = {
+}));
+var DisplayItem;
+(function(DisplayItem1) {
+    DisplayItem1[DisplayItem1["Clock"] = 1] = "Clock";
+    DisplayItem1[DisplayItem1["Steps"] = 2] = "Steps";
+    DisplayItem1[DisplayItem1["Distance"] = 4] = "Distance";
+    DisplayItem1[DisplayItem1["Calories"] = 8] = "Calories";
+    DisplayItem1[DisplayItem1["HeartRate"] = 16] = "HeartRate";
+    DisplayItem1[DisplayItem1["Battery"] = 32] = "Battery";
+})(DisplayItem || (DisplayItem = {
 }));
 var BatteryStatus;
 (function(BatteryStatus1) {
@@ -1938,6 +1948,43 @@ class Band extends EventEmitter {
             ...cmd
         ]).buffer);
     }
+    async setDisplayOnLiftWrist(display) {
+        await this.writeDisplayCommand(5, 0, display ? 1 : 0);
+    }
+    async scheduleDisplayOnLiftWrist(start, end) {
+        const buf = new Uint8Array([
+            5,
+            0,
+            1,
+            0,
+            0,
+            0,
+            0
+        ]);
+        buf[3] = start[0];
+        buf[4] = start[1];
+        buf[5] = end[0];
+        buf[6] = end[1];
+        await this.writeDisplayCommand(...buf);
+    }
+    async setGoalNotification(enabled) {
+        await this.writeDisplayCommand(6, 0, enabled ? 1 : 0);
+    }
+    async setDisplayCaller(enabled) {
+        await this.writeDisplayCommand(16, 0, 0, enabled ? 1 : 0);
+    }
+    async setDistanceUnit(unit) {
+        await this.writeDisplayCommand(3, 0, unit == "metric" ? 0 : 1);
+    }
+    async setDisconnectNotification(enabled) {
+        await this.writeDisplayCommand(12, 0, enabled ? 1 : 0, 0, 0, 0, 0);
+    }
+    async setTimeFormat(fmt) {
+        if (fmt !== 12 && fmt !== 24) {
+            throw new Error("Invalid format, must be 12 or 24");
+        }
+        await this.writeDisplayCommand(2, 0, fmt == 12 ? 0 : 1);
+    }
     async sendCustomAlert(type = AlertType.None, title = "", msg = "") {
         await this.chars.customAlert.writeValue(new Uint8Array([
             type,
@@ -2061,7 +2108,6 @@ class Band extends EventEmitter {
         await this.emit("dfuStart", type, bin.byteLength);
         await this.chars.firm.writeValueWithResponse(new Uint8Array([
             1,
-            8,
             ...Struct.pack("<I", [
                 bin.byteLength
             ]),
