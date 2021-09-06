@@ -1,4 +1,4 @@
-import { assertEquals, assertExists } from "./deps.ts";
+import { assertEquals } from "./deps.ts";
 import { decrIdent, incrIdent, trace } from "./logger.ts";
 import { reverseMapParams } from "./params.ts";
 import {
