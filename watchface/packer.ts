@@ -208,10 +208,6 @@ class Writer extends Array<number> {
           let b = res.data[i + 2];
           const a = res.data[i + 3];
 
-          if (a === 0) {
-            r = g = b = 0;
-          }
-
           const paletteIndex = palette!.findIndex((e) =>
             e.r === r && e.g === g && e.b === b && e.a === a
           );
@@ -259,12 +255,6 @@ class Writer extends Array<number> {
     };
 
     function addColor(r: number, g: number, b: number, a: number) {
-      if (a === 0) {
-        r = 0;
-        g = 0;
-        b = 0;
-      }
-
       const u32 = (r << 24) | (g << 16) | (b << 8) | a;
       const u24 = (r << 16) | (g << 8) | b;
 
