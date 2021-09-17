@@ -1,3 +1,4 @@
+import { decrIdent, incrIdent, trace } from "./logger.ts";
 import {
   MappedParamTable,
   Param,
@@ -33,6 +34,8 @@ export const ImageSetMap: ParamMap = {
     2: { name: "y" },
     3: { name: "imageIndex" },
     4: { name: "imageCount" },
+    5: { name: "unknown5" },
+    6: { name: "unknown6" },
   },
 };
 
@@ -61,6 +64,7 @@ export const NumberMap: ParamMap = {
     6: { name: "spacing" },
     7: { name: "imageIndex" },
     8: { name: "imageCount" },
+    9: { name: "unknown9" },
   },
 };
 
@@ -69,6 +73,7 @@ export const OneLineMonthAndDayMap: ParamMap = {
   children: {
     1: { ...NumberMap },
     2: { name: "delimiterImageIndex" },
+    3: { name: "unknown3" },
   },
 };
 
@@ -77,6 +82,10 @@ export const SeparateMonthAndDayMap: ParamMap = {
   children: {
     1: { ...NumberMap, name: "month" },
     2: { ...NumberMap, name: "day" },
+    4: {
+      name: "unknown4",
+      children: getUnknownChildren(9),
+    },
   },
 };
 
@@ -109,6 +118,7 @@ export const MonthAndDayMap: ParamMap = {
     2: { ...OneLineMonthAndDayMap },
     3: { name: "twoDigitsMonth" },
     4: { name: "twoDigitsDay" },
+    5: { name: "unknown5" },
   },
 };
 
@@ -234,7 +244,7 @@ export const ScaleMap: ParamMap = {
   },
 };
 
-export const UnknownType14D6 = {
+export const UnknownType14D6: ParamMap = {
   name: "unknown14D6",
   children: {
     1: { ...CoordinatesMap, name: "unknown1" },
@@ -243,6 +253,34 @@ export const UnknownType14D6 = {
   },
 };
 
+export const StepsMap: ParamMap = {
+  name: "steps",
+  children: {
+    1: { ...NumberMap, name: "step" },
+    2: { name: "unknown2" },
+  },
+};
+
+export const AnimationImageMap: ParamMap = {
+  name: "animationImage",
+  children: {
+    1: { name: "x" },
+    2: { name: "y" },
+    3: { name: "imageIndex" },
+    4: { name: "imageCount" },
+    5: { name: "x3" },
+  },
+};
+
+function getUnknownChildren(size: number) {
+  return Object.fromEntries(
+    new Array(size).fill(0).map((
+      _,
+      i,
+    ) => [i + 1, { name: "unknown" + (i + 1) }]),
+  );
+}
+
 export const ParameterMap: {
   [name: number]: ParamMap;
 } = {
@@ -250,6 +288,19 @@ export const ParameterMap: {
     name: "background",
     children: {
       1: { ...ImageMap },
+      2: { name: "unknown2" },
+      3: {
+        name: "unknown3",
+        children: getUnknownChildren(3),
+      },
+      4: {
+        name: "unknown4",
+        children: getUnknownChildren(3),
+      },
+      5: {
+        name: "unknown5",
+        children: getUnknownChildren(3),
+      },
     },
   },
   3: {
@@ -260,22 +311,24 @@ export const ParameterMap: {
       3: { ...TwoDigitsMap, name: "seconds" },
       4: { ...AmPmMap, name: "amPm" },
       5: { name: "drawingOrder" },
+      6: { name: "unknown6" },
+      7: { name: "unknown7" },
+      8: { name: "unknown8" },
       9: { name: "unknown9" },
+      10: { name: "unknown10" },
+      11: { name: "unknown11" },
     },
   },
   4: {
     name: "activity",
     children: {
-      1: {
-        name: "steps",
-        children: {
-          1: { ...NumberMap, name: "step" },
-        },
-      },
+      1: { ...StepsMap },
       2: { ...NumberMap, name: "stepsGoal" },
       3: { ...OneLineMonthAndDayMap, name: "calories" },
       4: { ...OneLineMonthAndDayMap, name: "pulse" },
       5: { ...FormattedNumberMap, name: "distance" },
+      6: { name: "unknown6" },
+      7: { name: "unknown7" },
     },
   },
   5: {
@@ -285,6 +338,8 @@ export const ParameterMap: {
       2: { ...ImageSetMap, name: "weekDay" },
       3: { ...DayAmPmMap },
       4: { ...CoordinatesMap, name: "unknown4" },
+      5: { name: "unknown5" },
+      6: { name: "unknown6" },
     },
   },
   6: {
@@ -299,6 +354,8 @@ export const ParameterMap: {
     name: "steps",
     children: {
       1: { ...NumberMap, name: "step" },
+      2: { name: "unknown2" },
+      3: { name: "unknown3" },
     },
   },
   8: {
@@ -327,7 +384,7 @@ export const ParameterMap: {
       1: {
         name: "animation",
         children: {
-          1: { name: "image" },
+          1: { ...AnimationImageMap, name: "image" },
           2: { name: "x1" },
           3: { name: "y1" },
           4: { name: "interval" },
@@ -346,6 +403,9 @@ export const ParameterMap: {
     children: {
       1: { ...TwoDigitsMap, name: "unknown1" },
       2: { ...TwoDigitsMap, name: "unknown2" },
+      3: { name: "unknown3" },
+      4: { name: "unknown4" },
+      5: { name: "unknown5" },
       6: { ...UnknownType14D6, name: "unknown6" },
       7: { ...UnknownType14D6, name: "unknown7" },
       8: { ...UnknownType14D6, name: "unknown8" },
@@ -354,28 +414,53 @@ export const ParameterMap: {
 };
 
 export function mapParams(params: ParamTable): MappedParamTable {
+  trace("Map Params");
   const res: MappedParamTable = {};
+  incrIdent();
   Object.entries(params).forEach(([k, v]) => {
+    trace("Param ID:", Number(k));
     const map = ParameterMap[Number(k)];
     if (!map) throw new Error("Invalid Param ID: " + k);
+    trace("Param Name:", map.name);
 
     function mapParamsChildren(v: Param[], _map = map) {
+      trace("Map Params Children");
       const r: MappedParamTable = {};
 
+      incrIdent();
       v.forEach((e) => {
+        trace("Param Children:", e.id);
         const m = _map.children?.[e.id];
         if (!m) throw new Error("Invalid Param ID: " + e.id);
+        trace("Child name:", m.name);
 
+        if (
+          e.children && e.children.length !== 0 &&
+          (!m.children ||
+            !e.children.every((ch) => ch.id in (m.children || {})))
+        ) {
+          throw new Error(
+            `Param has Children but Map layout doesn't. Map: ${_map.name}.${m.name}, Element: ${
+              Deno.inspect(e)
+            } ${Boolean(e.children)}, ${e.children.length !== 0}, (${!m
+              .children}, ${!e.children.every((ch) =>
+                ch.id in (m.children || {})
+              )})`,
+          );
+        }
         r[m.name] = e.children && m.children
           ? mapParamsChildren(e.children, m)
           : e.value;
       });
-
+      decrIdent();
       return r;
     }
 
+    incrIdent();
     res[map.name] = mapParamsChildren(v);
+    decrIdent();
   });
+  decrIdent();
   return res;
 }
 
@@ -392,6 +477,7 @@ const converters: {
 };
 
 export function reverseMapParams(params: MappedParamTable): ParamTable {
+  trace("Reverse Mapped Params");
   const table: ParamTable = {};
 
   function processMapped(

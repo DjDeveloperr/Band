@@ -67,10 +67,17 @@ export interface ParsedResource extends Resource {
 }
 
 export interface Watchface {
+  band: BandType;
   params: MappedParamTable;
   resources: Resource[];
 }
 
 export interface ParsedWatchface extends Watchface {
   resources: ParsedResource[];
+}
+
+export enum BandType {
+  BAND_4 = 345,
+  BAND_5 = 146,
+  BAND_6 = 148,
 }

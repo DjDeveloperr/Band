@@ -423,7 +423,7 @@ export class Band extends EventEmitter<BandEvents> {
     await this.chars.firm.writeValueWithResponse(
       new Uint8Array([
         0x01,
-        // 0x08,
+        0x08,
         ...Struct.pack("<I", [bin.byteLength]),
         ...Struct.pack("<I", [crc]),
       ]).buffer,

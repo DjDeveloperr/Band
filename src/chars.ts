@@ -195,6 +195,12 @@ export class BandCharacteristics extends Base {
       }
     };
 
+    this.firm.oncharacteristicvaluechanged = async () => {
+      console.log("Firmware Change", [
+        ...new Uint8Array(this.firm.value?.buffer ?? new ArrayBuffer(0)),
+      ]);
+    };
+
     this.activity.oncharacteristicvaluechanged = async () => {
       console.log("Activity Change", [
         ...new Uint8Array(this.activity.value?.buffer ?? new ArrayBuffer(0)),
@@ -249,5 +255,6 @@ export class BandCharacteristics extends Base {
     await this.steps.startNotifications();
     await this.fetch.startNotifications();
     await this.activity.startNotifications();
+    await this.firm.startNotifications();
   }
 }

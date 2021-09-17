@@ -1,6 +1,7 @@
 import { mapParams, totalParamSize } from "./params.ts";
 import { decrIdent, incrIdent, trace } from "./logger.ts";
 import {
+  BandType,
   Color,
   Param,
   ParamFlag,
@@ -40,7 +41,7 @@ class WatchfaceParser {
     trace("Parsed Header.");
     trace("  Sign:", header.sign);
     trace("  ParamSIze:", header.paramsSize);
-    trace("  Unknown:", header.unknownValue);
+    trace("  Band:", BandType[header.band]);
 
     trace("Parsing Param (Descriptor) List, Offset:", this.#offset);
     incrIdent();
@@ -126,6 +127,7 @@ class WatchfaceParser {
     }
 
     return {
+      band: header.band,
       params: mapParams(table),
       resources,
     };
@@ -133,22 +135,27 @@ class WatchfaceParser {
 
   sign!: string;
   paramsSize!: number;
-  unknownValue!: number;
+  band!: BandType;
 
   parseHeader() {
     const sign = this.#readCString();
-    assertEquals(sign, SIGN_STRING);
+    if (sign === "UIHH\x01") {
+      // Ignore that area (in Band 5 and 6)
+      this.#offset = 0x4F;
+    } else {
+      // It should be band 4
+      assertEquals(sign, SIGN_STRING);
+      const restSignAreaLength = SIGN_SIZE - (sign.length + 1);
+      const restSignArea = new Uint8Array(
+        this.#bin.buffer,
+        this.#offset,
+        restSignAreaLength,
+      );
+      assertEquals(restSignArea.every((v) => v === 0xFF), true);
+      this.#offset += restSignAreaLength;
+    }
 
-    const restSignAreaLength = SIGN_SIZE - (sign.length + 1);
-    const restSignArea = new Uint8Array(
-      this.#bin.buffer,
-      this.#offset,
-      restSignAreaLength,
-    );
-    assertEquals(restSignArea.every((v) => v === 0xFF), true);
-    this.#offset += restSignAreaLength;
-
-    const unknownValue = this.#view.getUint32(this.#offset, true);
+    const band = this.#view.getUint32(this.#offset, true);
     this.#offset += 4;
 
     const paramsSize = this.#view.getUint32(this.#offset, true);
@@ -156,11 +163,11 @@ class WatchfaceParser {
 
     this.sign = sign;
     this.paramsSize = paramsSize;
-    this.unknownValue = unknownValue;
+    this.band = band;
 
     return {
       sign,
-      unknownValue,
+      band,
       paramsSize,
     };
   }
@@ -188,11 +195,15 @@ class WatchfaceParser {
     let offset = 0;
     let children: Param[] = [];
 
+    // Value is encoded in some weird way (Idk if there's some name for that)
+    // So you keep reading bytes until it's first bit is 0
+    // First bit tells whether the next byte is to be included
+    // in the value or not. Rest 7 bits are the value.
     while ((i & 0x80) > 0) {
       if (size > 9) throw new Error("Invalid parameter value");
       value |= BigInt(i & 0x7F) << BigInt(offset);
-      offset += 7;
       i = this.#bin[this.#offset++];
+      offset += 7;
       size++;
     }
 
@@ -265,10 +276,10 @@ class WatchfaceParser {
 
     if (header.type === ResourceType.PALETTE) {
       assertExists(palette);
-      data = new Uint8Array(header.rowLength * header.height * 4);
+      data = new Uint8Array(header.width * header.height * 4);
       trace("Start Reading Palette Image at:", this.#offset);
       for (let y = 0; y < header.height; y++) {
-        for (let x = 0; x < header.rowLength; x++) {
+        for (let x = 0; x < header.width; x++) {
           const idx = this.#view.getUint8(this.#offset);
           const color = palette[idx];
           if (color === undefined) {
@@ -279,25 +290,25 @@ class WatchfaceParser {
           this.#offset++;
           data.set(
             [color.r, color.g, color.b, color.a],
-            (y * header.rowLength + x) * 4,
+            (y * header.width + x) * 4,
           );
         }
       }
     } else if (header.type === ResourceType.BIT_8) {
-      data = new Uint8Array(header.rowLength * header.height * 4);
+      data = new Uint8Array(header.width * header.height * 4);
       for (let y = 0; y < header.height; y++) {
-        for (let x = 0; x < header.rowLength; x++) {
+        for (let x = 0; x < header.width; x++) {
           const color = this.#view.getUint8(this.#offset++);
           data.set(
             [color, color, color, 255],
-            (y * header.rowLength + x) * 4,
+            (y * header.width + x) * 4,
           );
         }
       }
     } else if (header.type === ResourceType.BIT_16) {
-      data = new Uint8Array(header.rowLength * header.height * 4);
+      data = new Uint8Array(header.width * header.height * 4);
       for (let y = 0; y < header.height; y++) {
-        for (let x = 0; x < header.rowLength; x++) {
+        for (let x = 0; x < header.width; x++) {
           const first = this.#view.getUint8(this.#offset++);
           const second = this.#view.getUint8(this.#offset++);
 
@@ -308,14 +319,14 @@ class WatchfaceParser {
 
           data.set(
             [r, g, b, 255],
-            (y * header.rowLength + x) * 4,
+            (y * header.width + x) * 4,
           );
         }
       }
     } else if (header.type === ResourceType.BIT_24) {
-      data = new Uint8Array(header.rowLength * header.height * 4);
+      data = new Uint8Array(header.width * header.height * 4);
       for (let y = 0; y < header.height; y++) {
-        for (let x = 0; x < header.rowLength; x++) {
+        for (let x = 0; x < header.width; x++) {
           const a = this.#view.getUint8(this.#offset++);
           const first = this.#view.getUint8(this.#offset++).toString(2)
             .padStart(8, "0");
@@ -329,14 +340,14 @@ class WatchfaceParser {
 
           data.set(
             [r, g, b, 255 - a],
-            (y * header.rowLength + x) * 4,
+            (y * header.width + x) * 4,
           );
         }
       }
     } else if (header.type === ResourceType.BIT_32) {
-      data = new Uint8Array(header.rowLength * header.height * 4);
+      data = new Uint8Array(header.width * header.height * 4);
       for (let y = 0; y < header.height; y++) {
-        for (let x = 0; x < header.rowLength; x++) {
+        for (let x = 0; x < header.width; x++) {
           const a = this.#view.getUint8(this.#offset++) & 0xff;
           const r = this.#view.getUint8(this.#offset++) & 0xff;
           const g = this.#view.getUint8(this.#offset++) & 0xff;
@@ -344,7 +355,7 @@ class WatchfaceParser {
 
           data.set(
             [r, g, b, 255 - a],
-            (y * header.rowLength + x) * 4,
+            (y * header.width + x) * 4,
           );
         }
       }

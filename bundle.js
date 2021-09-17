@@ -1766,6 +1766,11 @@ class BandCharacteristics extends Base {
                 await this.band.emit("info", "No more activity fetch possible");
             }
         };
+        this.firm.oncharacteristicvaluechanged = async ()=>{
+            console.log("Firmware Change", [
+                ...new Uint8Array(this.firm.value?.buffer ?? new ArrayBuffer(0)), 
+            ]);
+        };
         this.activity.oncharacteristicvaluechanged = async ()=>{
             console.log("Activity Change", [
                 ...new Uint8Array(this.activity.value?.buffer ?? new ArrayBuffer(0)), 
@@ -1808,6 +1813,7 @@ class BandCharacteristics extends Base {
         await this.steps.startNotifications();
         await this.fetch.startNotifications();
         await this.activity.startNotifications();
+        await this.firm.startNotifications();
     }
 }
 class Band extends EventEmitter {
@@ -2114,6 +2120,7 @@ class Band extends EventEmitter {
         await this.emit("dfuStart", type, bin.byteLength);
         await this.chars.firm.writeValueWithResponse(new Uint8Array([
             1,
+            8,
             ...Struct.pack("<I", [
                 bin.byteLength
             ]),
